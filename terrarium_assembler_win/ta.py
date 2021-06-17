@@ -148,7 +148,7 @@ rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specf
                     print("*"*20)
                     print("Executing ", fname)
                     print("*"*20)
-                    os.system(fname, shell=True)
+                    os.system(fname)
         pass  
 
 
