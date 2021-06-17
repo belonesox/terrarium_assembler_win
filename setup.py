@@ -50,6 +50,9 @@ setup(
     # tests_require=test_requirements,
     url='https://github.com/belonesox/terrarium_assembler_win',
     setup_requires=['setuptools-git-versioning'],
-    version_config=True,
+    version_config={
+        "dev_template": "{tag}.dev{ccount}",
+        "dirty_template": "{tag}.dev{ccount}",
+    },
     zip_safe=False,
 )
