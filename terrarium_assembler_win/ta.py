@@ -498,7 +498,7 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Too
                             odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
                             lines.append(fR"""     
 msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
         """)
                     else:
                         platform_ = build.platforms
