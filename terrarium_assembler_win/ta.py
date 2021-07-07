@@ -599,8 +599,8 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.
                     #scmd = f'''tar -xf "{artefact}" --directory "{to_}" '''                    
                     lines.append(scmd)
 
-                if 'unzip-7z' in it_:
-                    to_ = it_.unzip
+                if 'unzip7' in it_:
+                    to_ = it_.unzip7
                     scmd = f'7z -y x {artefact} -o{to_}'
                     lines.append(scmd)
 
