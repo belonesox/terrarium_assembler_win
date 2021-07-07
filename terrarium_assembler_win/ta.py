@@ -604,6 +604,11 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.
                     scmd = f'7z -y x {artefact} -o{to_}'
                     lines.append(scmd)
 
+                if 'target' in it_:
+                    to_ = it_.target
+                    scmd = f'msiexec.exe /I {artefact} /QB-! INSTALLDIR="{to_}" TargetDir="{to_}"'
+                    lines.append(scmd)
+
                 if 'components' in it_:
                     msvc_components = " ".join(["--add " + comp for comp in it_.components])
 
