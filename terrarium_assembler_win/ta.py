@@ -417,8 +417,8 @@ if exist "{newpath}\" (
                 srcname = nb_.input_py
                 defaultname = os.path.splitext(srcname)[0] 
                 outputname = defaultname
-                if "output" in td_:
-                    outputname = td_.output
+                if "output" in nb_:
+                    outputname = nb_.output
 
                 nuitka_flags = nb_.nuitka_flags
                 nuitka_flags_inherit = self.spec[nuitka_flags.inherit]
