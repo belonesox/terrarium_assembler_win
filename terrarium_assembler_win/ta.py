@@ -445,25 +445,22 @@ move {tmpdir}\{defaultname}.dist\{defaultname}.exe {tmpdir}\{defaultname}.dist\{
 {self.spec.python_dir}\python -m pip freeze > {tmpdir}\{defaultname}.dist\{outputname}-pip-freeze.txt 
 ''')
 
-
                 if 'copy' in nb_:
                     for it_ in nb_.copy:
-                           scmd = fr'''echo n | copy /-y "{it_}" {tmpdir}\{defaultname}.dist'''
-                           lines.append(scmd)
+                        is_file = os.path.splitext(it_)[1] != ''
+                        cp_ = 'copy /-y' if is_file else 'xcopy /I /E /Y /D'
+                        lines.append(fr'echo n | {cp_} "{it_}" {tmpdir}\{defaultname}.dist')
 
                 if 'copy_and_rename' in nb_:
                     for to_, from_ in nb_.copy_and_rename.items():
-                        is_file = os.path.splitext(to_)[1] != ''
-                        to_ = to_.replace('/', '\\') 
-                        from_ = from_.replace('/', '\\') 
-                        if is_file:
-                            scmd = fr'''echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'''
-                            lines.append(scmd)
-                        else:
-                            lines.append(fr'''mkdir {tmpdir}\{defaultname}.dist\{to_}''')
-                            lines.append(scmd)
-                            scmd = fr'''echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'''
-                            lines.append(scmd)
+                        from_is_file = os.path.splitext(from_)[1] != ''
+                        to_ = to_.replace('/', '\\')
+                        from_ = from_.replace('/', '\\')
+                        to_dir = os.path.split(to_)[0]
+                        lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_dir}')
+                        cp_ = 'copy /-y' if from_is_file else 'xcopy /I /E /Y /D'
+                        scmd = fr'echo n | {cp_} "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
+                        lines.append(scmd)
 
             if 'jsbuild' in td_:
                 build = td_.jsbuild
@@ -598,6 +595,18 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.
                     scmd = f'''powershell -command "Expand-Archive -Force '{artefact}'  '{to_}'" '''                    
                     #scmd = f'''tar -xf "{artefact}" --directory "{to_}" '''                    
                     lines.append(scmd)
+
+                if 'unzip7' in it_:
+                    to_ = it_.unzip7
+                    scmd = f'7z -y x {artefact} -o{to_}'
+                    lines.append(scmd)
+
+                if 'target' in it_:
+                    to_ = it_.target
+                    scmds = f'''
+msiexec.exe /I {artefact} /QB-! INSTALLDIR="{to_}" TargetDir="{to_}"
+set PATH={to_};%PATH%'''.split('\n')
+                    lines += scmds
 
                 if 'components' in it_:
                     msvc_components = " ".join(["--add " + comp for comp in it_.components])
