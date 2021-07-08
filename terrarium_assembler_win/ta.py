@@ -445,24 +445,28 @@ move {tmpdir}\{defaultname}.dist\{defaultname}.exe {tmpdir}\{defaultname}.dist\{
 {self.spec.python_dir}\python -m pip freeze > {tmpdir}\{defaultname}.dist\{outputname}-pip-freeze.txt 
 ''')
 
-
                 if 'copy' in nb_:
                     for it_ in nb_.copy:
-                           scmd = fr'''echo n | copy /-y "{it_}" {tmpdir}\{defaultname}.dist'''
-                           lines.append(scmd)
+                        is_file = os.path.splitext(it_)[1] != ''
+                        cp_ = 'copy /-y' if is_file else 'xcopy /I /E /Y /D'
+                        lines.append(fr'echo n | {cp_} "{it_}" {tmpdir}\{defaultname}.dist')
 
                 if 'copy_and_rename' in nb_:
                     for to_, from_ in nb_.copy_and_rename.items():
-                        is_file = os.path.splitext(to_)[1] != ''
-                        to_ = to_.replace('/', '\\') 
-                        from_ = from_.replace('/', '\\') 
-                        if is_file:
-                            scmd = fr'''echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'''
+                        from_is_file = os.path.splitext(from_)[1] != ''
+                        to_is_file = os.path.splitext(to_)[1] != ''
+                        to_ = to_.replace('/', '\\')
+                        from_ = from_.replace('/', '\\')
+
+                        if from_is_file:
+                            if not to_is_file:
+                                lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_}')
+                            scmd = fr'echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
                             lines.append(scmd)
                         else:
-                            lines.append(fr'''mkdir {tmpdir}\{defaultname}.dist\{to_}''')
-                            lines.append(scmd)
-                            scmd = fr'''echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'''
+                            assert not to_is_file
+                            lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_}')
+                            scmd = fr'echo n | xcopy /I /E /Y /D "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
                             lines.append(scmd)
 
             if 'jsbuild' in td_:
