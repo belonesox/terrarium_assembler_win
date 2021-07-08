@@ -454,20 +454,13 @@ move {tmpdir}\{defaultname}.dist\{defaultname}.exe {tmpdir}\{defaultname}.dist\{
                 if 'copy_and_rename' in nb_:
                     for to_, from_ in nb_.copy_and_rename.items():
                         from_is_file = os.path.splitext(from_)[1] != ''
-                        to_is_file = os.path.splitext(to_)[1] != ''
                         to_ = to_.replace('/', '\\')
                         from_ = from_.replace('/', '\\')
-
-                        if from_is_file:
-                            if not to_is_file:
-                                lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_}')
-                            scmd = fr'echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
-                            lines.append(scmd)
-                        else:
-                            assert not to_is_file
-                            lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_}')
-                            scmd = fr'echo n | xcopy /I /E /Y /D "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
-                            lines.append(scmd)
+                        to_dir = os.path.split(to_)[0]
+                        lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_dir}')
+                        cp_ = 'copy /-y' if from_is_file else 'xcopy /I /E /Y /D'
+                        scmd = fr'echo n | {cp_} "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
+                        lines.append(scmd)
 
             if 'jsbuild' in td_:
                 build = td_.jsbuild
