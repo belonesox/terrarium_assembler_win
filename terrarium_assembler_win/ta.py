@@ -415,14 +415,21 @@ if exist "{newpath}\" (
             if 'nuitkabuild' in td_:
                 nb_ = td_.nuitkabuild
                 srcname = nb_.input_py
-                defaultname = os.path.splitext(srcname)[0] 
+                defaultname = os.path.splitext(srcname)[0]
                 outputname = defaultname
                 if "output" in nb_:
                     outputname = nb_.output
 
                 nuitka_flags = nb_.nuitka_flags
                 nuitka_flags_inherit = self.spec[nuitka_flags.inherit]
-                nfm_ = edict({**nuitka_flags_inherit, **nuitka_flags})
+                # Пока считаем, что наследоваться можно только один раз
+                assert 'inherit' not in nuitka_flags_inherit
+                nfm_ = edict({**nuitka_flags_inherit})
+                for group in nuitka_flags:
+                    if group in nfm_:
+                        nfm_[group] = list(set(nfm_[group]).union(set(nuitka_flags[group])))
+                    else:
+                        nfm_[group] = nuitka_flags[group]
                 del nfm_['inherit']
                 nf_ = NuitkaFlags(**nfm_)
                 nflags_ = nf_.get_flags(tmpdir, nfm_)
