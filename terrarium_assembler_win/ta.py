@@ -318,12 +318,18 @@ rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specf
             Just checking out sources.
             This stage should be done when we have authorization to check them out.
         '''
-        if "projects" not in  self.spec:
+        if "projects" not in self.spec:
             return
 
         args = self.args
         lines = []
         lines2 = []
+
+        # Install git lfs for user (need once)
+        lfs_install = 'git lfs install'
+        lines.append(lfs_install)
+        lines2.append(lfs_install)
+
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
         lines.append(f'mkdir {in_src} ')
         already_checkouted = set()
@@ -348,6 +354,7 @@ popd
 pushd "{path_to_dir}"
 git config core.fileMode false
 git pull
+git lfs pull
 {self.spec.python_dir}\python -m pip uninstall  {probably_package_name} -y
 {self.spec.python_dir}\python setup.py develop
 popd
