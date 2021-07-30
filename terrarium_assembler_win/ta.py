@@ -768,7 +768,7 @@ rmdir /S /Q  {wheel_dir}\*
     def get_wheel_list_to_install(self):
         '''
         Выбираем список wheel-пакетов для инсталляции, руководствуясь эвристиками:
-        * если несколько пакетов разных версий — берем большую версию
+        * если несколько пакетов разных версий — берем большую версию (но для пакетов по зависимостям берем меньшую версию)
         * Приоритеты пакетов таковы:
             * скачанные насильно пакеты в extwheel_dir
             * наши пакеты, собранные в ourwheel_dir
@@ -779,25 +779,40 @@ rmdir /S /Q  {wheel_dir}\*
 
         os.chdir(self.curdir)
 
-        def get_most_new_wheel_list(wheels_dir):
+        from enum import Enum, auto
+
+        class WheelVersionPolicy(Enum):
+            NEWEST = auto()
+            OLDEST = auto()
+
+        def get_wheel_list(wheels_dir, policy=WheelVersionPolicy.NEWEST):
+            assert policy in [WheelVersionPolicy.NEWEST,
+                              WheelVersionPolicy.OLDEST]
             wheels_dict = {}
 
             if os.path.exists(wheels_dir):
                 for whl in [os.path.join(wheels_dir, whl) 
                                 for whl in os.listdir(wheels_dir) 
-                                    if whl.endswith('.whl') or whl.endswith('.tar.gz') or whl.endswith('.tar.bz2')]:                                
+                                    if whl.endswith('.whl') or whl.endswith('.tar.gz') or whl.endswith('.tar.bz2')]:
                     pw_ = parse_wheel_filename(whl)
-                    name_ = pw_.project                                
+                    name_ = pw_.project
                     if name_ not in wheels_dict:
                         wheels_dict[name_] = whl
                     else:
-                        if version.parse(parse_wheel_filename(whl).version) > version.parse(parse_wheel_filename(wheels_dict[name_]).version):
-                            wheels_dict[name_] = whl 
+                        whl_version = version.parse(parse_wheel_filename(whl).version)
+                        our_version = version.parse(parse_wheel_filename(wheels_dict[name_]).version)
+                        if policy == WheelVersionPolicy.NEWEST:
+                            replace = whl_version > our_version
+                        else:
+                            assert policy == WheelVersionPolicy.OLDEST
+                            replace = whl_version < our_version
+                        if replace:
+                            wheels_dict[name_] = whl
             return wheels_dict
 
-        deps_ = get_most_new_wheel_list(self.spec.depswheel_dir)
-        exts_ = get_most_new_wheel_list(self.spec.extwheel_dir)
-        ours_ = get_most_new_wheel_list(self.spec.ourwheel_dir)
+        deps_ = get_wheel_list(self.spec.depswheel_dir, policy=WheelVersionPolicy.OLDEST)
+        exts_ = get_wheel_list(self.spec.extwheel_dir)
+        ours_ = get_wheel_list(self.spec.ourwheel_dir)
 
         wheels_dict = {**deps_, **exts_, **ours_}
 
