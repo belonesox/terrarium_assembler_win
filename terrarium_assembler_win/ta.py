@@ -656,11 +656,11 @@ set PATH={to_};%PATH%'''.split('\n')
 ''')
         if not os.path.exists(self.output_dir):
             os.mkdir(self.output_dir)
-        
+
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far procmon wget 
-""" 
+choco install -y far procmon wget git
+"""
         self.lines2bat("99-install-tools", [scmd])
         pass
 
@@ -768,7 +768,7 @@ rmdir /S /Q  {wheel_dir}\*
     def get_wheel_list_to_install(self):
         '''
         Выбираем список wheel-пакетов для инсталляции, руководствуясь эвристиками:
-        * если несколько пакетов разных версий — берем большую версию (но для пакетов по зависимостям берем меньшую версию)
+        * если несколько пакетов разных версий — берем большую версию (но для пакетов по зависимостям берём меньшую версию)
         * Приоритеты пакетов таковы:
             * скачанные насильно пакеты в extwheel_dir
             * наши пакеты, собранные в ourwheel_dir
