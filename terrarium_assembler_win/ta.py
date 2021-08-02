@@ -148,7 +148,7 @@ rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specf
                     print("*"*20)
                     print("Executing ", fname)
                     print("*"*20)
-                    os.system(fname, shell=True)
+                    os.system(fname)
         pass  
 
 
@@ -318,12 +318,18 @@ rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specf
             Just checking out sources.
             This stage should be done when we have authorization to check them out.
         '''
-        if "projects" not in  self.spec:
+        if "projects" not in self.spec:
             return
 
         args = self.args
         lines = []
         lines2 = []
+
+        # Install git lfs for user (need once)
+        lfs_install = 'git lfs install'
+        lines.append(lfs_install)
+        lines2.append(lfs_install)
+
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
         lines.append(f'mkdir {in_src} ')
         already_checkouted = set()
@@ -348,6 +354,7 @@ popd
 pushd "{path_to_dir}"
 git config core.fileMode false
 git pull
+git lfs pull
 {self.spec.python_dir}\python -m pip uninstall  {probably_package_name} -y
 {self.spec.python_dir}\python setup.py develop
 popd
@@ -415,14 +422,21 @@ if exist "{newpath}\" (
             if 'nuitkabuild' in td_:
                 nb_ = td_.nuitkabuild
                 srcname = nb_.input_py
-                defaultname = os.path.splitext(srcname)[0] 
+                defaultname = os.path.splitext(srcname)[0]
                 outputname = defaultname
-                if "output" in td_:
-                    outputname = td_.output
+                if "output" in nb_:
+                    outputname = nb_.output
 
                 nuitka_flags = nb_.nuitka_flags
                 nuitka_flags_inherit = self.spec[nuitka_flags.inherit]
-                nfm_ = edict({**nuitka_flags_inherit, **nuitka_flags})
+                # Пока считаем, что наследоваться можно только один раз
+                assert 'inherit' not in nuitka_flags_inherit
+                nfm_ = edict({**nuitka_flags_inherit})
+                for group in nuitka_flags:
+                    if group in nfm_:
+                        nfm_[group] = list(set(nfm_[group]).union(set(nuitka_flags[group])))
+                    else:
+                        nfm_[group] = nuitka_flags[group]
                 del nfm_['inherit']
                 nf_ = NuitkaFlags(**nfm_)
                 nflags_ = nf_.get_flags(tmpdir, nfm_)
@@ -445,25 +459,22 @@ move {tmpdir}\{defaultname}.dist\{defaultname}.exe {tmpdir}\{defaultname}.dist\{
 {self.spec.python_dir}\python -m pip freeze > {tmpdir}\{defaultname}.dist\{outputname}-pip-freeze.txt 
 ''')
 
-
                 if 'copy' in nb_:
                     for it_ in nb_.copy:
-                           scmd = fr'''echo n | copy /-y "{it_}" {tmpdir}\{defaultname}.dist'''
-                           lines.append(scmd)
+                        is_file = os.path.splitext(it_)[1] != ''
+                        cp_ = 'copy /-y' if is_file else 'xcopy /I /E /Y /D'
+                        lines.append(fr'echo n | {cp_} "{it_}" {tmpdir}\{defaultname}.dist')
 
                 if 'copy_and_rename' in nb_:
                     for to_, from_ in nb_.copy_and_rename.items():
-                        is_file = os.path.splitext(to_)[1] != ''
-                        to_ = to_.replace('/', '\\') 
-                        from_ = from_.replace('/', '\\') 
-                        if is_file:
-                            scmd = fr'''echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'''
-                            lines.append(scmd)
-                        else:
-                            lines.append(fr'''mkdir {tmpdir}\{defaultname}.dist\{to_}''')
-                            lines.append(scmd)
-                            scmd = fr'''echo n | copy /-y "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'''
-                            lines.append(scmd)
+                        from_is_file = os.path.splitext(from_)[1] != ''
+                        to_ = to_.replace('/', '\\')
+                        from_ = from_.replace('/', '\\')
+                        to_dir = os.path.split(to_)[0]
+                        lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_dir}')
+                        cp_ = 'copy /-y' if from_is_file else 'xcopy /I /E /Y /D'
+                        scmd = fr'echo n | {cp_} "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
+                        lines.append(scmd)
 
             if 'jsbuild' in td_:
                 build = td_.jsbuild
@@ -498,7 +509,7 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Too
                             odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
                             lines.append(fR"""     
 msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
         """)
                     else:
                         platform_ = build.platforms
@@ -599,6 +610,18 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.
                     #scmd = f'''tar -xf "{artefact}" --directory "{to_}" '''                    
                     lines.append(scmd)
 
+                if 'unzip7' in it_:
+                    to_ = it_.unzip7
+                    scmd = f'7z -y x {artefact} -o{to_}'
+                    lines.append(scmd)
+
+                if 'target' in it_:
+                    to_ = it_.target
+                    scmds = f'''
+msiexec.exe /I {artefact} /QB-! INSTALLDIR="{to_}" TargetDir="{to_}"
+set PATH={to_};%PATH%'''.split('\n')
+                    lines += scmds
+
                 if 'components' in it_:
                     msvc_components = " ".join(["--add " + comp for comp in it_.components])
 
@@ -633,11 +656,11 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.
 ''')
         if not os.path.exists(self.output_dir):
             os.mkdir(self.output_dir)
-        
+
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far procmon wget 
-""" 
+choco install -y far procmon wget git
+"""
         self.lines2bat("99-install-tools", [scmd])
         pass
 
@@ -745,7 +768,7 @@ rmdir /S /Q  {wheel_dir}\*
     def get_wheel_list_to_install(self):
         '''
         Выбираем список wheel-пакетов для инсталляции, руководствуясь эвристиками:
-        * если несколько пакетов разных версий — берем большую версию
+        * если несколько пакетов разных версий — берем большую версию (но для пакетов по зависимостям берём меньшую версию)
         * Приоритеты пакетов таковы:
             * скачанные насильно пакеты в extwheel_dir
             * наши пакеты, собранные в ourwheel_dir
@@ -756,25 +779,40 @@ rmdir /S /Q  {wheel_dir}\*
 
         os.chdir(self.curdir)
 
-        def get_most_new_wheel_list(wheels_dir):
+        from enum import Enum, auto
+
+        class WheelVersionPolicy(Enum):
+            NEWEST = auto()
+            OLDEST = auto()
+
+        def get_wheel_list(wheels_dir, policy=WheelVersionPolicy.NEWEST):
+            assert policy in [WheelVersionPolicy.NEWEST,
+                              WheelVersionPolicy.OLDEST]
             wheels_dict = {}
 
             if os.path.exists(wheels_dir):
                 for whl in [os.path.join(wheels_dir, whl) 
                                 for whl in os.listdir(wheels_dir) 
-                                    if whl.endswith('.whl') or whl.endswith('.tar.gz') or whl.endswith('.tar.bz2')]:                                
+                                    if whl.endswith('.whl') or whl.endswith('.tar.gz') or whl.endswith('.tar.bz2')]:
                     pw_ = parse_wheel_filename(whl)
-                    name_ = pw_.project                                
+                    name_ = pw_.project
                     if name_ not in wheels_dict:
                         wheels_dict[name_] = whl
                     else:
-                        if version.parse(parse_wheel_filename(whl).version) > version.parse(parse_wheel_filename(wheels_dict[name_]).version):
-                            wheels_dict[name_] = whl 
+                        whl_version = version.parse(parse_wheel_filename(whl).version)
+                        our_version = version.parse(parse_wheel_filename(wheels_dict[name_]).version)
+                        if policy == WheelVersionPolicy.NEWEST:
+                            replace = whl_version > our_version
+                        else:
+                            assert policy == WheelVersionPolicy.OLDEST
+                            replace = whl_version < our_version
+                        if replace:
+                            wheels_dict[name_] = whl
             return wheels_dict
 
-        deps_ = get_most_new_wheel_list(self.spec.depswheel_dir)
-        exts_ = get_most_new_wheel_list(self.spec.extwheel_dir)
-        ours_ = get_most_new_wheel_list(self.spec.ourwheel_dir)
+        deps_ = get_wheel_list(self.spec.depswheel_dir, policy=WheelVersionPolicy.OLDEST)
+        exts_ = get_wheel_list(self.spec.extwheel_dir)
+        ours_ = get_wheel_list(self.spec.ourwheel_dir)
 
         wheels_dict = {**deps_, **exts_, **ours_}
 
