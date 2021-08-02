@@ -21,6 +21,26 @@ from .wheel_utils import parse_wheel_filename
 from .utils import *
 from .nuitkaflags import *
 
+
+def write_doc_table(filename, headers, rows):
+    with open(filename, 'w', encoding='utf-8') as lf:
+        lf.write(f"""
+<table class='wikitable' border=1>
+""")            
+        lf.write(f"""<tr>""")
+        for col_ in headers:
+            lf.write(f"""<th>{col_}</th>""")
+        lf.write(f"""</tr>\n""")
+        for row_ in rows:
+            lf.write(f"""<tr>""")
+            for col_ in row_:
+                lf.write(f"""<td>{col_}</td>""")
+            lf.write(f"""</tr>\n""")
+        lf.write(f"""
+</table>
+""")            
+    return
+
 def fix_win_command(scmd):
     '''
     Из-за большего удобства, мы допускаем в YAML описывать некоторые пути через 
