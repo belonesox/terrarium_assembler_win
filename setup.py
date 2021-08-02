@@ -43,7 +43,7 @@ setup(
     license="MIT license",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
-    keywords='terrarium_assembler',
+    keywords='terrarium_assembler_win',
     name='terrarium_assembler_win',
     packages=find_packages(include=['terrarium_assembler_win', 'terrarium_assembler_win.*']),
     # test_suite='tests',

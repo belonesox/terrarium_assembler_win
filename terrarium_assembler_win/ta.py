@@ -565,7 +565,7 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.
                     scmd = fix_win_command(scmd)
                     lines.append(scmd)
 
-        self.lines2bat("02-download-utilities", lines, "download-utilities")    
+        self.lines2bat("01-download-utilities", lines, "download-utilities")    
         pass
 
 

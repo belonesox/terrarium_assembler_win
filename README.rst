@@ -1,29 +1,24 @@
 ===================
-terrarium-assembler
+terrarium-assembler-win
 ===================
 
 
-.. image:: https://img.shields.io/pypi/v/terrarium_assembler.svg
-        :target: https://pypi.python.org/pypi/terrarium_assembler
+.. image:: https://img.shields.io/pypi/v/terrarium_assembler_win.svg
+        :target: https://pypi.python.org/pypi/terrarium_assembler_win
 
-.. image:: https://img.shields.io/travis/belonesox/terrarium_assembler.svg
-        :target: https://travis-ci.com/belonesox/terrarium_assembler
+.. image:: https://img.shields.io/travis/belonesox/terrarium_assembler_win.svg
+        :target: https://travis-ci.com/belonesox/terrarium_assembler_win
 
-.. image:: https://readthedocs.org/projects/terrarium-assembler/badge/?version=latest
-        :target: https://terrarium-assembler.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/terrarium-assembler-win/badge/?version=latest
+        :target: https://terrarium-assembler-win.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
 
-Generate Portable Linux Applications, 
-mostly using python packages and any system package,
-that can be run on any Linux,
-without Docker, Snap, Flathub, etc.
-
-Just portable folder.
+Generate Portable Compiled Windows Applications, 
+mostly using python packages.
 
 
-* Free software: MIT license
-* Documentation: https://terrarium-assembler.readthedocs.io.
+* Free software: MIT licensea
 
 
 Features
