@@ -16,6 +16,8 @@ import datetime
 import tarfile
 import hashlib 
 import time
+import json
+import csv
 
 from .wheel_utils import parse_wheel_filename
 from .utils import *
@@ -90,7 +92,8 @@ class TerrariumAssembler:
             'install-wheels': 'Install our and external Python wheels',
             'build-projects': 'Compile Python packages to executable',
             # 'make-isoexe': 'Also make self-executable install archive and ISO disk',
-            # 'pack-me' :  'Pack current dir to time prefixed tar.bz2'
+            'pack-me' :  'Pack current dir to time prefixed tar.bz2',
+            'gen-docs' :  'Generate docs about sources/packages'
         }
 
         for stage, desc in self.stages.items():
@@ -781,6 +784,9 @@ rmdir /S /Q  {wheel_dir}\*
             scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --ignore-installed  %s ' % p_
             lines.append(fix_win_command(scmd))
 
+        scmd = fr'{self.spec.python_dir}/python -m pip list --format json > python-packages.json'
+        lines.append(fix_win_command(scmd))
+
         self.lines2bat("15-install-wheels", lines, "install-wheels")
         pass    
 
@@ -839,32 +845,42 @@ rmdir /S /Q  {wheel_dir}\*
         return list(wheels_dict.values())
 
 
-    # def pack_me(self):    
-    #     time_prefix = datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
-    #     parentdir, curname = os.path.split(self.curdir)
-    #     disabled_suffix = curname + '.tar.bz2'
+    def pack_me(self): 
+        '''
+        Pack sources and deps for audit
+        '''   
+        time_prefix = datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
+        parentdir, curname = os.path.split(self.curdir)
+        disabled_suffix = curname + '.tar.bz2'
 
-    #     banned_ext = ['.old', '.iso', disabled_suffix]
-    #     banned_start = ['tmp']
-    #     banned_mid = ['/out/', '/wtf/', '/.vagrant/', '/.git/']
+        banned_ext = ['.old', '.iso', '.lock', disabled_suffix, '.dblite', '.tmp', '.log']
+        banned_start = ['tmp']
+        banned_mid = ['/out', '/wtf', '/ourwheel/', '/.vagrant', '/.git', '/.vscode', '/key/', '/tmp/', '/src.', '/bin.',  '/cache_', 'cachefilelist_', '/.image', '/!']
 
-    #     def filter_(tarinfo):
-    #         for s in banned_ext:
-    #             if tarinfo.name.endswith(s):
-    #                 print(tarinfo.name)
-    #                 return None
+        def filter_(tarinfo):
+            for s in banned_ext:
+                if tarinfo.name.endswith(s):
+                    print(tarinfo.name)
+                    return None
 
-    #         for s in banned_start:
-    #             if tarinfo.name.startswith(s):
-    #                 print(tarinfo.name)
-    #                 return None
+            for s in banned_start:
+                if tarinfo.name.startswith(s):
+                    print(tarinfo.name)
+                    return None
 
-    #         for s in banned_mid:
-    #             if s in tarinfo.name:
-    #                 print(tarinfo.name)
-    #                 return None
+            for s in banned_mid:
+                if s in tarinfo.name:
+                    print(tarinfo.name)
+                    return None
 
-    #         return tarinfo          
+            return tarinfo          
+
+
+        tbzname = os.path.join(self.curdir, 
+                "%(time_prefix)s-%(curname)s.tar.bz2" % vars())
+        tar = tarfile.open(tbzname, "w:bz2")
+        tar.add(self.curdir, "./sources-for-audit", recursive=True, filter=filter_)
+        tar.close()    
 
 
     #     tbzname = os.path.join(self.curdir, 
@@ -902,6 +918,43 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
         self.lines2bat('50-output', lines)
         pass    
 
+    def gen_docs(self):
+        '''
+        Генерация некоторой автодокументации
+        '''
+        root_dir = self.root_dir
+        pp_json = 'python-packages.json'
+        pp_htm = 'doc-python-packages.htm'
+        if os.path.exists(pp_json) and not os.path.exists(pp_htm):
+            try:
+                json_ = json.loads(open(pp_json, 'r', encoding='utf-8').read())
+                rows_ = []
+                for r_ in json_:
+                    rows_.append([r_['name'], r_['version']])
+
+                write_doc_table(pp_htm, ['Package', 'Version'], sorted(rows_))
+            except Exception as ex_:
+                print(ex_)
+                pass    
+
+
+        cloc_csv = 'cloc.csv'
+        if not os.path.exists(cloc_csv):
+            if shutil.which('cloc'):
+                os.system(f'cloc ./in/src/ --csv  --report-file="{cloc_csv}" --3')
+
+        if os.path.exists(cloc_csv):
+            table_csv = []
+            with open(cloc_csv, newline='') as csvfile:
+                csv_r = csv.reader(csvfile, delimiter=',', quotechar='|')
+                for row in list(csv_r)[1:]:
+                    row[-1] = int(float(row[-1]))
+                    table_csv.append(row)
+
+            table_csv[-1][-2], table_csv[-1][-1] = table_csv[-1][-1], table_csv[-1][-2]       
+            write_doc_table('doc-cloc.htm', ['Файлов', 'Язык', 'Пустых', 'Комментариев', 'Строчек кода', 'Мощность языка', 'COCOMO строк'], 
+                            table_csv)        
+
 
 
     def process(self):
@@ -910,6 +963,12 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
         и возможно его выполнения, если соответствующие опции 
         командной строки активированы.
         '''
+        if self.args.stage_pack_me:
+            self.pack_me()
+            return
+
+        self.gen_docs()
+
         self.write_sandbox()
         self.generate_build_projects()
         self.generate_download()
