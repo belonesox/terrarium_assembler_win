@@ -662,29 +662,85 @@ set PATH={to_};%PATH%'''.split('\n')
         для чистой сборки в нулевой системе.
         '''
         root_dir = self.root_dir
-        with open('ta-sandbox.wsb', 'wt', encoding='utf-8') as lf:
-            lf.write(fr'''
+        wsb_config = fr'''
 <Configuration><MappedFolders> 
-<MappedFolder><HostFolder>{self.root_dir}</HostFolder> 
+<MappedFolder><HostFolder>%~dp0</HostFolder> 
 <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\distro</SandboxFolder> 
-<ReadOnly>false</ReadOnly></MappedFolder> 
-<MappedFolder><HostFolder>{self.root_dir}\out</HostFolder> 
-<SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\out</SandboxFolder> 
 <ReadOnly>false</ReadOnly></MappedFolder> 
 </MappedFolders> 
 <LogonCommand> 
 <Command>C:\Users\WDAGUtilityAccount\Desktop\distro\99-install-tools.bat</Command> 
 </LogonCommand> 
 </Configuration> 
-''')
+'''
+        lines = []
+
+
+        lines.append(f'''
+rem        
+setlocal enableDelayedExpansion        
+type nul > ta-sandbox.wsb 
+''')    
+        for line in wsb_config.strip().split("\n"):
+            lines.append(f'set "tag_line={line}"')    
+            lines.append(f'echo !tag_line! >> ta-sandbox.wsb ')    
+
+        lines.append(f'start ta-sandbox.wsb')    
+
+        self.lines2bat("00-start-sandbox-for-building", lines)
+
+
         if not os.path.exists(self.output_dir):
             os.mkdir(self.output_dir)
 
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far procmon wget git
+choco install -y far 
+rem choco install -y procmon git windirstat 
+rem choco install -y --allow-downgrade wget --version 1.20.3.20190531
 """
         self.lines2bat("99-install-tools", [scmd])
+
+        with open("install-all-wheels.py", "w", encoding='utf-8') as lf:
+            lf.write("""
+import sys
+import os
+import glob
+
+wheels_to_install = []
+
+for path_ in sys.argv[1:]:
+    for whl in glob.glob(f'{path_}/*.whl'):
+        wheels_to_install.append(whl)
+
+wheels = " ".join(wheels_to_install)
+
+scmd = fr'''
+{sys.executable} -m pip install --no-deps --force-reinstall --ignore-installed {wheels} 
+'''
+
+print(scmd)
+os.system(scmd)
+""")
+
+        scmd = R"""
+call 02-install-utilities.bat 
+call 15-install-wheels.bat
+call 09-build-wheels.bat
+call 15-install-wheels.bat
+call 40-build-projects.bat
+call 50-output.bat
+call 51-make-iso.bat
+"""
+        self.lines2bat("98-install-and-build-for-audit", [scmd])
+
+        python_dir = self.spec.python_dir.replace("/", "\\")
+        scmd = fR"""
+rem
+set datestr=%date:~10,4%-%date:~7,2%-%date:~4,2%
+{python_dir}\python.exe {python_dir}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/dm-win-distr-%datestr%.iso out/iso
+"""
+        self.lines2bat("51-make-iso", [scmd])
         pass
 
 
@@ -700,14 +756,16 @@ choco install -y far procmon wget git
         lines = []
         wheel_dir = self.spec.depswheel_dir.replace("/", "\\")
         lines.append(fr'''
-rmdir /S /Q  {wheel_dir}\*        
+del /q {wheel_dir}\*        
 ''')
 
+        paths_ = []
         for pp in self.spec.python_packages:
-            scmd = fr'echo "** Downloading wheel for {pp} **"' 
-            lines.append(scmd)                
-            scmd = fr"{self.spec.python_dir}\python -m pip download {pp} --dest {wheel_dir} " 
-            lines.append(scmd)                
+            # scmd = fr'echo "** Downloading wheel for {pp} **"' 
+            # lines.append(scmd)                
+            # scmd = fr"{self.spec.python_dir}\python -m pip download {pp} --dest {wheel_dir} " 
+            # lines.append(scmd)                
+            paths_.append(pp)
 
         for git_url, td_ in self.spec.projects.items():
             if 'pybuild' not in td_:
@@ -715,16 +773,41 @@ rmdir /S /Q  {wheel_dir}\*
 
             git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
             probably_package_name = os.path.split(path_to_dir_)[-1]
-            path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
-            scmd = fr'echo "** Downloading dependend wheels for {path_to_dir} **"' 
-            lines.append(scmd)                
+            # path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
+            # scmd = fr'echo "** Downloading dependend wheels for {path_to_dir} **"' 
+            # lines.append(scmd)                
             
-            setup_path = path_to_dir
-            path_ = os.path.relpath(setup_path, start=self.curdir)
+            path_ = setup_path = path_to_dir_
+            # path_ = os.path.relpath(setup_path, start=self.curdir)
+
+            os.chdir(self.curdir)
             if os.path.exists(setup_path):
-                scmd = fr"{self.spec.python_dir}\python -m pip download {setup_path} --dest {wheel_dir} " 
-                lines.append(fix_win_command(scmd))                
+                os.chdir(setup_path)
+                is_python_package = False
+                for file_ in ['setup.py', 'pyproject.toml', 'requirements.txt']:
+                    if os.path.exists(file_):
+                        is_python_package = True
+                        break
+
+                if is_python_package:
+                    paths_.append(path_)
+
             pass
+
+        os.chdir(self.curdir)
+        setup_paths = " ".join(paths_)        
+
+        scmd = fr"{self.spec.python_dir}\python -m pip download {setup_paths} --dest {wheel_dir} " 
+        lines.append(fix_win_command(scmd))                
+
+
+        scmd = fr"""
+pushd {wheel_dir}
+for %%D in (*.tar.*) do {self.spec.python_dir}\python.exe -m pip wheel --no-deps %%D 
+del *.tar.*
+popd 
+""" 
+        lines.append(scmd)                
 
         self.lines2bat("07-download-wheels", lines, "download-wheels")
         pass    
@@ -774,15 +857,18 @@ rmdir /S /Q  {wheel_dir}\*
         os.chdir(self.curdir)
 
         lines = []
-        pl_ = self.get_wheel_list_to_install()
+        # pl_ = self.get_wheel_list_to_install()
 
         #--use-feature=2020-resolver
-        scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --no-dependencies --ignore-installed  %s ' % (" ".join(pl_))
-        lines.append(fix_win_command(scmd))
+        # scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --no-dependencies --ignore-installed  %s ' % (" ".join(pl_))
+        # lines.append(fix_win_command(scmd))
 
-        for p_ in pl_:
-            scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --ignore-installed  %s ' % p_
-            lines.append(fix_win_command(scmd))
+        # for p_ in pl_:
+        #     scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --ignore-installed  %s ' % p_
+        #     lines.append(fix_win_command(scmd))
+
+        scmd = fr'{self.spec.python_dir}/python install-all-wheels.py {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
+        lines.append(fix_win_command(scmd))
 
         scmd = fr'{self.spec.python_dir}/python -m pip list --format json > python-packages.json'
         lines.append(fix_win_command(scmd))
@@ -855,7 +941,7 @@ rmdir /S /Q  {wheel_dir}\*
 
         banned_ext = ['.old', '.iso', '.lock', disabled_suffix, '.dblite', '.tmp', '.log']
         banned_start = ['tmp']
-        banned_mid = ['/out', '/wtf', '/ourwheel/', '/.vagrant', '/.git', '/.vscode', '/key/', '/tmp/', '/src.', '/bin.',  '/cache_', 'cachefilelist_', '/.image', '/!']
+        banned_mid = ['/out', '/wtf', '/ourwheel/', '/ourwheel-', '/test.', '/test/', '/.vagrant', '/.vscode', '/key/', '/tmp/', '/src.', '/bin.',  '/cache_', 'cachefilelist_', '/.image', '/!']
 
         def filter_(tarinfo):
             for s in banned_ext:
@@ -877,8 +963,9 @@ rmdir /S /Q  {wheel_dir}\*
 
 
         tbzname = os.path.join(self.curdir, 
-                "%(time_prefix)s-%(curname)s.tar.bz2" % vars())
-        tar = tarfile.open(tbzname, "w:bz2")
+                "%(time_prefix)s-%(curname)s.tar" % vars())
+        # tar = tarfile.open(tbzname, "w:bz2")
+        tar = tarfile.open(tbzname, "w")
         tar.add(self.curdir, "./sources-for-audit", recursive=True, filter=filter_)
         tar.close()    
 
