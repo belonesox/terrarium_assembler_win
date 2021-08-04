@@ -11,6 +11,7 @@ with open('HISTORY.rst') as history_file:
 requirements = [ 
     'easydict',
     'pytictoc',
+    'pyyaml', 
 #    'nuitka',
     'file-magic',
     'jinja2', 
