@@ -290,18 +290,42 @@ if exist "{newpath}\" (
                     outputname = nb_.output
 
                 nuitka_flags = nb_.nuitka_flags
-                nuitka_flags_inherit = self.spec[nuitka_flags.inherit]
-                # Пока считаем, что наследоваться можно только один раз
-                assert 'inherit' not in nuitka_flags_inherit
-                nfm_ = edict({**nuitka_flags_inherit})
-                for group in nuitka_flags:
-                    if group in nfm_:
-                        nfm_[group] = list(set(nfm_[group]).union(set(nuitka_flags[group])))
-                    else:
-                        nfm_[group] = nuitka_flags[group]
-                del nfm_['inherit']
-                nf_ = NuitkaFlags(**nfm_)
-                nflags_ = nf_.get_flags(tmpdir, nfm_)
+
+                def inherit_flags(nuitka_flags):
+                    if 'inherit' in nuitka_flags:
+                        nuitka_flags_inherit = self.spec[nuitka_flags.inherit]
+                        # Рекурсивно требуем наследования
+                        nuitka_flags_inherit = inherit_flags(nuitka_flags_inherit)
+                        # Проверяем, что унаследовались.
+                        assert 'inherit' not in nuitka_flags_inherit
+                        nfm_ = edict({**nuitka_flags_inherit})
+                        for group in nuitka_flags:
+                            if group in nfm_:
+                                nfm_[group] = list(set(nfm_[group] or []).union(set(nuitka_flags[group] or [])))
+                            else:
+                                nfm_[group] = nuitka_flags[group]
+                        del nfm_['inherit']
+                        return nfm_
+                    return nuitka_flags    
+
+                if 'snsm' in outputname:
+                    wtfff=1
+
+                nuitka_flags = inherit_flags(nuitka_flags)
+
+                # nuitka_flags_inherit = self.spec[nuitka_flags.inherit]
+                # # Пока считаем, что наследоваться можно только один раз
+                # assert 'inherit' not in nuitka_flags_inherit
+                # nfm_ = edict({**nuitka_flags_inherit})
+                # for group in nuitka_flags:
+                #     if group in nfm_:
+                #         nfm_[group] = list(set(nfm_[group]).union(set(nuitka_flags[group])))
+                #     else:
+                #         nfm_[group] = nuitka_flags[group]
+                # del nfm_['inherit']
+
+                nf_ = NuitkaFlags(**nuitka_flags)
+                nflags_ = nf_.get_flags(tmpdir, nuitka_flags)
 
                 target_dir = os.path.join(tmpdir, outputname + '.dist')
                 target_dir_ = os.path.relpath(target_dir, start=self.curdir)
