@@ -926,7 +926,6 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
         self.gen_docs()
 
         self.write_sandbox()
-        self.generate_build_projects()
         self.generate_download()
         self.generate_install()
         self.generate_checkout_sources()
@@ -934,5 +933,6 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
         for _ in range(2):
             self.generate_build_wheels()
             self.generate_install_wheels()
+        self.generate_build_projects()
         self.generate_output()
         pass
