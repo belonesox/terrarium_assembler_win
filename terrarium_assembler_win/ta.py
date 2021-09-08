@@ -91,9 +91,10 @@ class TerrariumAssembler:
             'build-wheels': 'compile wheels for our python sources',
             'install-wheels': 'Install our and external Python wheels',
             'build-projects': 'Compile Python packages to executable',
-            # 'make-isoexe': 'Also make self-executable install archive and ISO disk',
-            'pack-me' :  'Pack current dir to time prefixed tar.bz2',
-            'gen-docs' :  'Generate docs about sources/packages'
+            'pack_me' :  'Pack current dir to time prefixed tar.bz2',
+            'output' :   'Generate «out» for ditribution',
+            'gen-docs' : 'Generate docs about sources/packages',
+            'make-iso': 'Make ISO disk from distribution',
         }
 
         for stage, desc in self.stages.items():
@@ -116,7 +117,7 @@ class TerrariumAssembler:
             self.args.stage_build_wheels = True
             self.args.stage_install_wheels = True
             self.args.stage_build_projects = True
-            self.args.stage_pack = self.args.stage_build_and_pack
+            self.args.stage_output = self.args.stage_build_and_pack
 
         if self.args.stage_my_source_changed:
             self.args.stage_checkout = True
@@ -124,7 +125,7 @@ class TerrariumAssembler:
             self.args.stage_build_wheels = True
             self.args.stage_install_wheels = True
             self.args.stage_build_projects = True
-            self.args.stage_pack = self.args.stage_my_source_changed
+            self.args.stage_output = self.args.stage_my_source_changed
 
         if self.args.stage_download_all:
             self.args.stage_download_rpms = True
@@ -609,7 +610,7 @@ rem
 set datestr=%date:~10,4%-%date:~7,2%-%date:~4,2%
 {python_dir}\python.exe {python_dir}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/dm-win-distr-%datestr%.iso out/iso
 """
-        self.lines2bat("51-make-iso", [scmd])
+        self.lines2bat("51-make-iso", [scmd], 'make-iso')
         pass
 
 
@@ -871,7 +872,7 @@ mkdir {dst_folder}
                 lines.append(fR"""    
 echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
     """)
-        self.lines2bat('50-output', lines)
+        self.lines2bat('50-output', lines, 'output')
         pass    
 
     def gen_docs(self):
@@ -925,7 +926,6 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
 
         self.gen_docs()
 
-        self.write_sandbox()
         self.generate_download()
         self.generate_install()
         self.generate_checkout_sources()
@@ -935,4 +935,5 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
             self.generate_install_wheels()
         self.generate_build_projects()
         self.generate_output()
+        self.write_sandbox()
         pass
