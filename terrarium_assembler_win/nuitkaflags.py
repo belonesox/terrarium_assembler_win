@@ -144,11 +144,11 @@ class NuitkaFlags:
             flags.append('--standalone') 
             flags.append('--follow-imports') 
             if "modules" in target_:
-                for it_ in target_.modules:
+                for it_ in target_.modules or []:
                     flags.append('--nofollow-import-to=' + it_)
 
             if 'force_modules' in target_:
-                for it_ in target_.force_modules:
+                for it_ in target_.force_modules or []:
                     flags.append('--include-module=' + it_)
 
 

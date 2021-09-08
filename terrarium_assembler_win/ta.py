@@ -318,6 +318,11 @@ move {tmpdir}\{defaultname}.dist\{defaultname}.exe {tmpdir}\{defaultname}.dist\{
 ''')
 
                 lines.append(fr'''
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
+editbin /largeaddressaware {tmpdir}\{defaultname}.dist\{outputname}.exe 
+''')
+
+                lines.append(fr'''
 {self.spec.python_dir}\python -m pip freeze > {tmpdir}\{defaultname}.dist\{outputname}-pip-freeze.txt 
 ''')
 
