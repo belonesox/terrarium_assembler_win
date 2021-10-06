@@ -126,6 +126,7 @@ class TerrariumAssembler:
             self.args.stage_install_wheels = True
             self.args.stage_build_projects = True
             self.args.stage_output = self.args.stage_my_source_changed
+            self.args.stage_make_iso = True
 
         if self.args.stage_download_all:
             self.args.stage_download_rpms = True
@@ -695,7 +696,7 @@ popd
         wheelpath = wheel_dir
 
         relwheelpath = os.path.relpath(wheelpath, start=self.curdir)
-        lines.append(fr"rmdir /S /Q  {relwheelpath}\*.*")
+        lines.append(fr"rmdir /S /Q  {relwheelpath}")
 
         for git_url, td_ in self.spec.projects.items():
             if 'pybuild' not in td_:
