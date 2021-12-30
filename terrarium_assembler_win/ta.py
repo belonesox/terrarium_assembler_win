@@ -237,6 +237,12 @@ if exist "{newpath}\" (
         self.lines2bat("96-pullall", lines2)    
         pass
 
+    def get_all_sources(self):
+        # for td_ in self.spec.projects:
+        for git_url, td_ in self.spec.projects.items():
+            git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
+            yield git_url, git_branch, path_to_dir_
+
     def explode_pp_node(self, git_url, td_):
         '''
         Преобразует неоднозначное описание yaml-ноды пакета в git_url и branch
@@ -566,8 +572,9 @@ type nul > ta-sandbox.wsb
 
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far 
-rem choco install -y procmon git windirstat 
+choco install -y far md5sums
+choco install -y --allow-downgrade wget --version 1.20.3.20190531
+rem choco install -y procmon git windirstat md5sums
 rem choco install -y --allow-downgrade wget --version 1.20.3.20190531
 """
         self.lines2bat("99-install-tools", [scmd])
@@ -605,11 +612,43 @@ call 51-make-iso.bat
 """
         self.lines2bat("98-install-and-build-for-audit", [scmd])
 
+        lines_ = []
+        for git_url, git_branch, path_to_dir_ in self.get_all_sources():
+            lines_.append(f'''
+@echo ---- Changelog for {path_to_dir_} >> out/%changelogfilename%
+git -C {path_to_dir_} log --since="%pyyyy%-%pmm%-%pdd%" --pretty --name-status   >> out/%changelogfilename%
+            ''')
+        changelog_mode = "\n".join(lines_)
+
+
         python_dir = self.spec.python_dir.replace("/", "\\")
         scmd = fR"""
 rem
-set datestr=%date:~10,4%-%date:~7,2%-%date:~4,2%
+for /f "skip=1" %%x in ('wmic os get localdatetime') do if not defined CurDate set CurDate=%%x
+echo %CurDate%
+set yyyy=%CurDate:~0,4%
+set mm=%CurDate:~4,2%
+set dd=%CurDate:~6,2%
+set hh=%CurDate:~8,2%
+set mi=%CurDate:~10,2%
+set ss=%CurDate:~12,2%
+set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
+set isoprefix=%datestr%-dm-win-distr
+set isofilename=%isoprefix%.iso
+set changelogfilename=%isoprefix%.changelog.txt
+echo %isofilename% > out/iso/isodistr.txt
+rem for /f "tokens=*" %%i in ('dir /b /o:n "out\*.iso"') do @echo %%~ni >> names.txt
+for /f "tokens=*" %%i in ('dir /b /o:n "out\*.iso"') do set lastiso=%%~ni 
+set /a "pyyyy=%yyyy%-1"
+if not defined lastiso set lastiso=%pyyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
+set pyyyy=%lastiso:~0,4%
+set pmm=%lastiso:~5,2%
+set pdd=%lastiso:~8,2%
+echo "%pyyyy%-%pmm%-%pdd%"
+{changelog_mode}
 {python_dir}\python.exe {python_dir}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/dm-win-distr-%datestr%.iso out/iso
+@echo ;MD5: >> out/%changelogfilename%
+md5sum out/%isofilename% >> out/%changelogfilename%
 """
         self.lines2bat("51-make-iso", [scmd], 'make-iso')
         pass
