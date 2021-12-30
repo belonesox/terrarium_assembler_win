@@ -210,6 +210,7 @@ rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specf
 git --git-dir=/dev/null clone  {git_url} {newpath} 
 pushd {newpath} 
 git checkout {git_branch}
+git lfs pull
 popd
 ''' 
                 lines.append(scmd)
