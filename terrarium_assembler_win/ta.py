@@ -647,7 +647,7 @@ set pmm=%lastiso:~5,2%
 set pdd=%lastiso:~8,2%
 echo "%pyyyy%-%pmm%-%pdd%"
 {changelog_mode}
-{python_dir}\python.exe {python_dir}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/dm-win-distr-%datestr%.iso out/iso
+{python_dir}\python.exe {python_dir}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/%isofilename% out/iso
 @echo ;MD5: >> out/%changelogfilename%
 md5sum out/%isofilename% >> out/%changelogfilename%
 """
