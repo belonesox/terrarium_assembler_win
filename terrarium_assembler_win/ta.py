@@ -404,6 +404,10 @@ C:\Windows\Microsoft.NET\Framework\v4.0.30319\jsc /out:{outfile}  {infile}
                     lines.append(R"""
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
     """ % vars(self))
+                    # if os.path.exists(os.path.join(folder_, 'packages.config')):
+                    lines.append(fR"""     
+nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config 
+""")
                     if isinstance(build.platforms, list):
                         for platform_ in build.platforms:
                             odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
