@@ -12,7 +12,7 @@ requirements = [
     'easydict',
     'pytictoc',
     'pyyaml', 
-#    'nuitka',
+    'pipenv',
     'file-magic',
     'jinja2', 
     'packaging',
