@@ -821,7 +821,8 @@ conan remove  --locks
         relwheelpath = os.path.relpath(wheelpath, start=self.curdir)
         lines.append(fr"""
 set PIPENV_PIPFILE=%~dp0Pipfile
-set CONANROOT={self.spec.buildroot_dir}\conan_user_home\.conan\data
+set CONAN_USER_HOME=%~dp0in\libscon
+set CONANROOT=%CONAN_USER_HOME%\.conan\data
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
 rmdir /S /Q  {relwheelpath}       
 """)
