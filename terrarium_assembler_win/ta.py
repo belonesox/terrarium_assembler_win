@@ -73,7 +73,13 @@ class TerrariumAssembler:
         # self.buildroot_dir = 'C:/docmarking-buildroot'
         self.ta_name = 'terrarium_assembler'
 
+        self.pipenv_dir = ''
+        from pipenv.project import Project
+        p = Project()
+        self.pipenv_dir = p.virtualenv_location
+
         vars_ = {
+            'pipenv_dir': self.pipenv_dir,
             # 'buildroot_dir': self.buildroot_dir
         }
 
@@ -87,7 +93,9 @@ class TerrariumAssembler:
             # 'download-msvc' : 'download MSVC versions',
             'checkout' : 'checkout sources',
             'install-utilities': 'install downloaded utilities',
+            'init-env': 'install environment',
             'download-wheels': 'download needed WHL-python packages',
+            'build-conanlibs': 'compile conan libraries',
             'build-wheels': 'compile wheels for our python sources',
             'install-wheels': 'Install our and external Python wheels',
             'build-projects': 'Compile Python packages to executable',
@@ -114,6 +122,7 @@ class TerrariumAssembler:
 
         if self.args.stage_build_and_pack:
             self.args.stage_install_utilities = True
+            self.args.stage_init_env = True
             self.args.stage_build_wheels = True
             self.args.stage_install_wheels = True
             self.args.stage_build_projects = True
@@ -220,8 +229,8 @@ pushd "{path_to_dir}"
 git config core.fileMode false
 git pull
 git lfs pull
-{self.spec.python_dir}\python -m pip uninstall  {probably_package_name} -y
-{self.spec.python_dir}\python setup.py develop
+{self.spec.python_dir}\python -m -m pipenv run pip uninstall  {probably_package_name} -y
+{self.spec.python_dir}\python -m pipenv run python setup.py develop
 popd
 ''')
 
@@ -343,7 +352,7 @@ if exist "{newpath}\" (
                 flags_ = nflags_
 
                 lines.append(fr'''
-{self.spec.python_dir}\python -m nuitka {nflags_}  {src} 2>&1 > {build_name}.log
+{self.spec.python_dir}\python -m pipenv run python -m nuitka {nflags_}  {src} 2>&1 > {build_name}.log
 ''')
                 if defaultname != outputname:
                     lines.append(fr'''
@@ -356,7 +365,7 @@ editbin /largeaddressaware {tmpdir}\{defaultname}.dist\{outputname}.exe
 ''')
 
                 lines.append(fr'''
-{self.spec.python_dir}\python -m pip freeze > {tmpdir}\{defaultname}.dist\{outputname}-pip-freeze.txt 
+{self.spec.python_dir}\python -m pipenv run pip freeze > {tmpdir}\{defaultname}.dist\{outputname}-pip-freeze.txt 
 ''')
 
                 if 'copy' in nb_:
@@ -538,6 +547,27 @@ set PATH={to_};%PATH%'''.split('\n')
         self.lines2bat("02-install-utilities", lines, "install-utilities")    
         pass
 
+
+    def generate_init_env(self):
+        '''
+        Генерация командного скрипта инсталляции pipenv-энвайромента
+        '''
+        root_dir = self.root_dir
+        args = self.args
+        packages = []
+        lines = []
+
+        python_dir = self.spec.python_dir.replace("/", "\\")
+
+        lines.append(fr'''
+del /Q Pipfile
+{python_dir}\python -m pipenv --rm
+{python_dir}\python -m pipenv --python {self.spec.python_mversion}        
+        ''')
+
+        self.lines2bat("05-init-env", lines, "init-env")    
+        pass
+
     def write_sandbox(self):
         '''
         Генерация Windows-песочницы (облегченной виртуальной машины)
@@ -670,8 +700,11 @@ md5sum out/%isofilename% >> out/%changelogfilename%
 
         lines = []
         wheel_dir = self.spec.depswheel_dir.replace("/", "\\")
+        ourwheel_dir = self.spec.ourwheel_dir.replace("/", "\\")
         lines.append(fr'''
-del /q {wheel_dir}\*        
+del /q {wheel_dir}\*     
+set CONAN_USER_HOME=%~dp0in\libscon
+set CONANROOT=%CONAN_USER_HOME%\.conan\data
 ''')
 
         paths_ = []
@@ -712,20 +745,66 @@ del /q {wheel_dir}\*
         os.chdir(self.curdir)
         setup_paths = " ".join(paths_)        
 
-        scmd = fr"{self.spec.python_dir}\python -m pip download {setup_paths} --dest {wheel_dir} " 
+        scmd = fr"{self.spec.python_dir}\python -m pipenv run pip download {setup_paths} --dest {wheel_dir} --find-links {ourwheel_dir} " 
         lines.append(fix_win_command(scmd))                
 
 
         scmd = fr"""
-pushd {wheel_dir}
-for %%D in (*.tar.*) do {self.spec.python_dir}\python.exe -m pip wheel --no-deps %%D 
-del *.tar.*
-popd 
+for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
+del {wheel_dir}\*.tar.*
 """ 
         lines.append(scmd)                
 
-        self.lines2bat("07-download-wheels", lines, "download-wheels")
+        self.lines2bat("09-download-wheels", lines, "download-wheels")
         pass    
+
+
+    def generate_build_conanlibs(self):
+        '''
+        Генерация сборки конан пакетов
+        '''
+        os.chdir(self.curdir)
+        lines = []
+
+        python_dir = self.spec.python_dir.replace("/", "\\")
+        wheel_dir = self.spec.ourwheel_dir.replace("/", "\\")
+        wheelpath = wheel_dir
+
+        relwheelpath = os.path.relpath(wheelpath, start=self.curdir)
+        lines.append(fr"""
+set PIPENV_PIPFILE=%~dp0Pipfile
+set CONAN_USER_HOME=%~dp0in\libscon
+set CONANROOT=%CONAN_USER_HOME%\.conan\data
+set PYTHONHOME={python_dir}
+set PATH=%PYTHONHOME%;%PYTHONHOME%\scripts;%PATH%;
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
+conan remove  --locks
+""")
+        for git_url, td_ in self.spec.projects.items():
+            if 'conanbuild' not in td_:
+                continue
+
+            git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
+            probably_package_name = os.path.split(path_to_dir_)[-1]
+            path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
+            relwheelpath = os.path.relpath(wheelpath, start=path_to_dir_)
+
+            setup_path = path_to_dir
+            scmd = fr'echo "** Building lib for {setup_path} **"' 
+            lines.append(scmd)                
+            
+            setup_path = path_to_dir
+            path_ = os.path.relpath(setup_path, start=self.curdir)
+            if os.path.exists(setup_path):
+                scmd = "pushd %s" % (path_to_dir)
+                lines.append(scmd)
+                relwheelpath = os.path.relpath(wheelpath, start=path_to_dir)
+                scmd = fr"conan create . stable/dm -pr:b profile_build -pr:h profile_host -b missing" 
+                lines.append(fix_win_command(scmd))                
+                lines.append('popd')
+            pass
+        self.lines2bat("07-build-conanlibs", lines, "build-conanlibs")
+        pass
 
 
     def generate_build_wheels(self):
@@ -740,8 +819,12 @@ popd
         wheelpath = wheel_dir
 
         relwheelpath = os.path.relpath(wheelpath, start=self.curdir)
-        lines.append(fr"rmdir /S /Q  {relwheelpath}")
-
+        lines.append(fr"""
+set PIPENV_PIPFILE=%~dp0Pipfile
+set CONANROOT={self.spec.buildroot_dir}\conan_user_home\.conan\data
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
+rmdir /S /Q  {relwheelpath}       
+""")
         for git_url, td_ in self.spec.projects.items():
             if 'pybuild' not in td_:
                 continue
@@ -761,11 +844,11 @@ popd
                 scmd = "pushd %s" % (path_to_dir)
                 lines.append(scmd)
                 relwheelpath = os.path.relpath(wheelpath, start=path_to_dir)
-                scmd = fr"{python_dir}\python setup.py bdist_wheel -d {relwheelpath} " 
+                scmd = fr"{python_dir}\python -m pipenv run python setup.py bdist_wheel -d {relwheelpath}" 
                 lines.append(fix_win_command(scmd))                
                 lines.append('popd')
             pass
-        self.lines2bat("09-build-wheels", lines, "build-wheels")
+        self.lines2bat("08-build-wheels", lines, "build-wheels")
         pass
 
     def generate_install_wheels(self):
@@ -782,10 +865,10 @@ popd
         #     scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --ignore-installed  %s ' % p_
         #     lines.append(fix_win_command(scmd))
 
-        scmd = fr'{self.spec.python_dir}/python install-all-wheels.py {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
+        scmd = fr'{self.spec.python_dir}/python -m pipenv run python install-all-wheels.py {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
         lines.append(fix_win_command(scmd))
 
-        scmd = fr'{self.spec.python_dir}/python -m pip list --format json > python-packages.json'
+        scmd = fr'{self.spec.python_dir}/python -m pipenv run pip list --format json > python-packages.json'
         lines.append(fix_win_command(scmd))
 
         self.lines2bat("15-install-wheels", lines, "install-wheels")
@@ -973,8 +1056,10 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
 
         self.generate_download()
         self.generate_install()
+        self.generate_init_env()
         self.generate_checkout_sources()
         self.generate_download_wheels()
+        self.generate_build_conanlibs()
         for _ in range(2):
             self.generate_build_wheels()
             self.generate_install_wheels()
