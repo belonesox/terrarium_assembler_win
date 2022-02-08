@@ -794,14 +794,14 @@ conan remove  --locks
             lines.append(scmd)                
             
             setup_path = path_to_dir
-            path_ = os.path.relpath(setup_path, start=self.curdir)
-            if os.path.exists(setup_path):
-                scmd = "pushd %s" % (path_to_dir)
-                lines.append(scmd)
-                relwheelpath = os.path.relpath(wheelpath, start=path_to_dir)
-                scmd = fr"conan create . stable/dm -pr:b profile_build -pr:h profile_host -b missing" 
-                lines.append(fix_win_command(scmd))                
-                lines.append('popd')
+            # path_ = os.path.relpath(setup_path, start=self.curdir)
+            # if os.path.exists(setup_path):
+            scmd = "pushd %s" % (path_to_dir)
+            lines.append(scmd)
+            relwheelpath = os.path.relpath(wheelpath, start=path_to_dir)
+            scmd = fr"conan create . stable/dm -pr:b profile_build -pr:h profile_host -b missing" 
+            lines.append(fix_win_command(scmd))                
+            lines.append('popd')
             pass
         self.lines2bat("07-build-conanlibs", lines, "build-conanlibs")
         pass
