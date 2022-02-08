@@ -776,7 +776,7 @@ set PIPENV_PIPFILE=%~dp0Pipfile
 set CONAN_USER_HOME=%~dp0in\libscon
 set CONANROOT=%CONAN_USER_HOME%\.conan\data
 set PYTHONHOME={python_dir}
-set PATH=%PYTHONHOME%;%PYTHONHOME%\scripts;%PATH%;
+set PATH=%PYTHONHOME%;%PYTHONHOME%\scripts;C:\Program Files\CMake\bin;%PATH%;
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
 conan remove  --locks
 """)
