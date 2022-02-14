@@ -291,7 +291,9 @@ if exist "{newpath}\" (
         lines2 = []
         bfiles = []
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
-        tmpdir = os.path.join(self.spec.buildroot_dir, 'builds')
+        tmpdir = os.path.relpath(self.spec.builds_dir, start=self.curdir)
+        
+        # os.path.join(self.curdir, 'tmp', 'builds')
 
         for git_url, td_ in self.spec.projects.items():
             lines = []
