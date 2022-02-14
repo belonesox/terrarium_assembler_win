@@ -422,16 +422,19 @@ nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config
                     if isinstance(build.platforms, list):
                         for platform_ in build.platforms:
                             odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
+                            rodir_ = os.path.relpath(odir_, start=folder_)
+
                             lines.append(fR"""     
 msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  /p:OutputPath="{odir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
         """)
                     else:
                         platform_ = build.platforms
                         odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
+                        rodir_ = os.path.relpath(odir_, start=folder_)
                         lines.append(fR"""     
 msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutputPath="{odir_}" /p:OutDir="{odir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  /p:OutputPath="{rodir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
     """)
 
             if lines:
