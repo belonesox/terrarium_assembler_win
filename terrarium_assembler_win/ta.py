@@ -1031,7 +1031,7 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
 
         cloc_csv = 'cloc.csv'
         if not os.path.exists(cloc_csv):
-            if shutil.which('cloc'):
+            if shutil.which('cloc') and 0:
                 os.system(f'cloc ./in/src/ --csv  --report-file="{cloc_csv}" --3')
 
         if os.path.exists(cloc_csv):
