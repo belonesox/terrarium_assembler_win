@@ -57,12 +57,22 @@ def yaml_load(filename, vars_=None):
     env.lstrip_blocks = True
     env.rstrip_blocks = True            
 
+    def basename(path):
+        return os.path.basename(path)
+
+    def dirname(path):
+        return os.path.dirname(path)    
+
+    env.filters['basename'] = basename
+    env.filters['dirname']  = dirname        
+
     template = env.get_template(filename_)
 
     real_yaml = ''
     try:
         for try_ in range(5):
             real_yaml = template.render(vars_)
+            #print(real_yaml[:200])
             ld = yaml.safe_load(real_yaml)
             vars_ = {**vars_, **ld}
 
@@ -71,7 +81,7 @@ def yaml_load(filename, vars_=None):
         #         vars_[key] = vars_[key].replace('/', '@')
 
         real_yaml = template.render(vars_)
-        fc = edict(yaml.safe_load(template.render(vars_)))
+        fc = edict(yaml.safe_load(real_yaml))
     except Exception as ex_:
         print(f'Error parsing {filename_} see "troubles.yml" ')    
         with open("troubles.yml", 'w', encoding='utf-8') as lf:
