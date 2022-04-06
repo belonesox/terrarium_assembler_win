@@ -465,11 +465,11 @@ msbuild  /p:OutputPath="{rodir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{buil
 
         def download_to(url_, to_, force_dir=False):
             dir2download = to_
-            scmd = f'wget --no-check-certificate -P {dir2download} -c {url_} '
+            scmd = f'wget --no-check-certificate -P {dir2download} -c "{url_}" '
             if os.path.splitext(to_) and not force_dir:
                 dir2download, filename = os.path.split(to_)
                 lines.append(f'mkdir {dir2download}'.replace('/','\\'))
-                scmd = f'wget --no-check-certificate -O {dir2download}/{filename} -c {url_} '
+                scmd = f'wget --no-check-certificate -O {dir2download}/{filename} -c "{url_}" '
             lines.append(scmd)
 
 
