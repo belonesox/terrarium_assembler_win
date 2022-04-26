@@ -650,7 +650,7 @@ venv_path = os.environ["VIRTUAL_ENV"]
 isofilename = os.environ["isofilename"]
 
 scmd = fr'''
-{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/dm-win-distr-{isofilename} out/iso
+{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/{isofilename} out/iso
 '''
 print(scmd)
 os.system(scmd)
@@ -704,7 +704,7 @@ echo "%pyyyy%-%pmm%-%pdd%"
 {changelog_mode}
 {python_dir}\python.exe -m pipenv run python make-iso.py
 @echo ;MD5: >> out/%changelogfilename%
-md5sum out/%isofilename% >> out/%changelogfilename%
+md5sums out/%isofilename% >> out/%changelogfilename%
 """
         self.lines2bat("51-make-iso", [scmd], 'make-iso')
         pass
