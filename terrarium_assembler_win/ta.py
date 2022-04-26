@@ -641,6 +641,22 @@ print(scmd)
 os.system(scmd)
 """)
 
+        with open("make-iso.py", "w", encoding='utf-8') as lf:
+            lf.write("""
+import sys
+import os
+
+venv_path = os.environ["VIRTUAL_ENV"]
+isofilename = os.environ["isofilename"]
+
+scmd = fr'''
+{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/dm-win-distr-{isofilename} out/iso
+'''
+print(scmd)
+os.system(scmd)
+""")
+
+
         scmd = R"""
 call 02-install-utilities.bat 
 call 15-install-wheels.bat
@@ -686,7 +702,7 @@ set pmm=%lastiso:~5,2%
 set pdd=%lastiso:~8,2%
 echo "%pyyyy%-%pmm%-%pdd%"
 {changelog_mode}
-{python_dir}\python.exe {python_dir}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/%isofilename% out/iso
+{python_dir}\python.exe -m pipenv run python make-iso.py
 @echo ;MD5: >> out/%changelogfilename%
 md5sum out/%isofilename% >> out/%changelogfilename%
 """
