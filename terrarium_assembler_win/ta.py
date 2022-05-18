@@ -367,7 +367,7 @@ editbin /largeaddressaware {tmpdir}\{defaultname}.dist\{outputname}.exe
 ''')
 
                 lines.append(fr'''
-{self.spec.python_dir}\python -m pipenv run pip freeze > {tmpdir}\{defaultname}.dist\{outputname}-pip-freeze.txt 
+{self.spec.python_dir}\python -m pipenv run pip list > {tmpdir}\{defaultname}.dist\{outputname}-pip-list.txt 
 ''')
 
                 if 'copy' in nb_:
