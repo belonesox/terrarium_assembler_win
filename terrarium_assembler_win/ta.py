@@ -131,6 +131,7 @@ class TerrariumAssembler:
         if self.args.stage_my_source_changed:
             self.args.stage_checkout = True
             self.args.stage_download_wheels = True
+            self.args.stage_init_env = True
             self.args.stage_build_wheels = True
             self.args.stage_install_wheels = True
             self.args.stage_build_projects = True
