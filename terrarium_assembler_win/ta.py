@@ -435,7 +435,7 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build
                         rodir_ = os.path.relpath(odir_, start=folder_)
                         lines.append(fR"""     
 msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutputPath="{rodir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  /p:OutputPath="{odir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
     """)
 
             if lines:
