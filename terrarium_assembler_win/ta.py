@@ -894,6 +894,10 @@ rmdir /S /Q  {relwheelpath}
         scmd = fr'{self.spec.python_dir}/python -m pipenv run pip list --format json > python-packages.json'
         lines.append(fix_win_command(scmd))
 
+        if 'pipenv_shell_commands' in self.spec:
+            for scmd in self.spec.pipenv_shell_commands:
+                lines.append(fix_win_command(scmd))
+
         self.lines2bat("15-install-wheels", lines, "install-wheels")
         pass    
 
