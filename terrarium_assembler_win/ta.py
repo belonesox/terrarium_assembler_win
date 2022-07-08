@@ -79,8 +79,8 @@ class TerrariumAssembler:
         self.pipenv_dir = p.virtualenv_location
 
         vars_ = {
-            'pipenv_dir': self.pipenv_dir,
-            # 'buildroot_dir': self.buildroot_dir
+        #     'pipenv_dir': self.pipenv_dir,
+        #     # 'buildroot_dir': self.buildroot_dir
         }
 
         ap = argparse.ArgumentParser(description='Create a portable windows application')
@@ -146,7 +146,7 @@ class TerrariumAssembler:
         specfile_  = expandpath(args.specfile)
         self.root_dir = os.path.split(specfile_)[0]
         os.environ['TERRA_SPECDIR'] = os.path.split(specfile_)[0]
-        self.spec = yaml_load(specfile_, vars_)    
+        self.spec, self.tvars = yaml_load(specfile_, vars_)    
         self.start_dir = os.getcwd()
         pass
 
@@ -169,6 +169,15 @@ class TerrariumAssembler:
 rem Stage "{desc}"
 rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specfile}" 
 ''')
+            lf.write(f'''
+set TA_PROJECT_DIR=%~dp0
+for /f %%i in ('{self.spec.python_dir}\python -m pipenv --venv') do set TA_PIPENV_DIR=%%i
+''')
+
+            for k, v in self.tvars.items():
+                if type(v) in [type(''), type(1)]:
+                    lf.write(f'''set TA_{k}="{v}"\n''')
+
             lf.write("\n".join(lines))
 
         st = os.stat(fname)
@@ -427,7 +436,7 @@ nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config
 
                             lines.append(fR"""     
 msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutputPath="{odir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
         """)
                     else:
                         platform_ = build.platforms
@@ -435,7 +444,7 @@ msbuild  /p:OutputPath="{odir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build
                         rodir_ = os.path.relpath(odir_, start=folder_)
                         lines.append(fR"""     
 msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutputPath="{odir_}" /p:OutDir="{rodir_}\\" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
     """)
 
             if lines:

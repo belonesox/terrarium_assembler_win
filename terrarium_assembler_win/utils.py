@@ -87,10 +87,7 @@ def yaml_load(filename, vars_=None):
         with open("troubles.yml", 'w', encoding='utf-8') as lf:
             lf.write(real_yaml)
         raise ex_    
-    # for key in fc:
-    #     if key.endswith('_dir'):
-    #         fc[key] = fc[key].replace('/', '\\')
-    return fc
+    return fc, vars_
 
 
 
