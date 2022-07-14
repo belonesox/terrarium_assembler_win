@@ -113,6 +113,7 @@ class TerrariumAssembler:
         ap.add_argument('--stage-my-source-changed', default='', type=str, help='Fast rebuild/repack if only pythonsourcechanged')
         ap.add_argument('--stage-all', default='', type=str, help='Install, build and pack')
         ap.add_argument('--stage-pack', default='', type=str, help='Stage pack to given destination directory')
+        ap.add_argument('--folder-command', default='', type=str, help='Perform some shell command for all projects')
         ap.add_argument('specfile', type=str, help='Specification File')
         
         self.args = args = ap.parse_args()
@@ -964,6 +965,27 @@ rmdir /S /Q  {relwheelpath}
 
         return list(wheels_dict.values())
 
+    def folder_command(self):
+        '''
+         Performing same command on all project folders
+        '''
+
+        if "projects" not in self.spec:
+            return
+
+        in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
+        already_checkouted = set()
+
+        for git_url, td_ in self.spec.projects.items():
+            git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
+            if path_to_dir_ not in already_checkouted:
+                probably_package_name = os.path.split(path_to_dir_)[-1]
+                already_checkouted.add(path_to_dir_)
+                path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
+
+                os.chdir(path_to_dir)
+                os.system(self.args.folder_command)
+                os.chdir(self.curdir)
 
     def pack_me(self): 
         '''
@@ -1084,6 +1106,11 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
         и возможно его выполнения, если соответствующие опции 
         командной строки активированы.
         '''
+
+        if self.args.folder_command:
+            self.folder_command()
+            return
+
         if self.args.stage_pack_me:
             self.pack_me()
             return
