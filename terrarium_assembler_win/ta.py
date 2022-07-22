@@ -171,15 +171,20 @@ rem Stage "{desc}"
 rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specfile}" 
 ''')
             lf.write(f'''
+set PIPENV_VENV_IN_PROJECT=1
 set TA_PROJECT_DIR=%~dp0
-for /f %%i in ('{self.spec.python_dir}\python -m pipenv --venv') do set TA_PIPENV_DIR=%%i
+for /f %%i in ('{self.spec.python_dir}\python -E -m pipenv --venv') do set TA_PIPENV_DIR=%%i
 ''')
 
             for k, v in self.tvars.items():
                 if type(v) in [type(''), type(1)]:
-                    lf.write(f'''set TA_{k}="{v}"\n''')
+                    lf.write(f'''set TA_{k}={v}\n''')
 
+            lf.write(f'''
+set PYTHONHOME=%TA_python_dir%
+''')
             lf.write("\n".join(lines))
+
 
         st = os.stat(fname)
         os.chmod(fname, st.st_mode | stat.S_IEXEC)
@@ -240,8 +245,8 @@ pushd "{path_to_dir}"
 git config core.fileMode false
 git pull
 git lfs pull
-{self.spec.python_dir}\python -m -m pipenv run pip uninstall  {probably_package_name} -y
-{self.spec.python_dir}\python -m pipenv run python setup.py develop
+{self.spec.python_dir}\python -E -m pipenv run pip uninstall  {probably_package_name} -y
+{self.spec.python_dir}\python -E -m pipenv run python setup.py develop
 popd
 ''')
 
@@ -365,7 +370,9 @@ if exist "{newpath}\" (
                 flags_ = nflags_
 
                 lines.append(fr'''
-{self.spec.python_dir}\python -m pipenv run python -m nuitka {nflags_}  {src} 2>&1 > {build_name}.log
+rmdir /S /Q %TMP%\gen_py
+.venv\Scripts\python.exe -m nuitka {nflags_}  {src} 2>&1 > {build_name}.log
+IF %ERRORLEVEL% NEQ 0 EXIT 1
 ''')
                 if defaultname != outputname:
                     lines.append(fr'''
@@ -378,7 +385,7 @@ editbin /largeaddressaware {tmpdir}\{defaultname}.dist\{outputname}.exe
 ''')
 
                 lines.append(fr'''
-{self.spec.python_dir}\python -m pipenv run pip list > {tmpdir}\{defaultname}.dist\{outputname}-pip-list.txt 
+.venv\Scripts\python.exe -m pip list > {tmpdir}\{defaultname}.dist\{outputname}-pip-list.txt 
 ''')
 
                 if 'copy' in nb_:
@@ -577,8 +584,8 @@ set PATH={to_};%PATH%'''.split('\n')
 
         lines.append(fr'''
 del /Q Pipfile
-{python_dir}\python -m pipenv --rm
-{python_dir}\python -m pipenv --python {self.spec.python_mversion}        
+{python_dir}\python -E -m pipenv --rm
+{python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe        
         ''')
 
         self.lines2bat("05-init-env", lines, "init-env")    
@@ -713,7 +720,7 @@ set pmm=%lastiso:~5,2%
 set pdd=%lastiso:~8,2%
 echo "%pyyyy%-%pmm%-%pdd%"
 {changelog_mode}
-{python_dir}\python.exe -m pipenv run python make-iso.py
+{python_dir}\python.exe -E -m pipenv run python make-iso.py
 @echo ;MD5: >> out/%changelogfilename%
 md5sums out/%isofilename% >> out/%changelogfilename%
 """
@@ -777,12 +784,12 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
         os.chdir(self.curdir)
         setup_paths = " ".join(paths_)        
 
-        scmd = fr"{self.spec.python_dir}\python -m pipenv run pip download {setup_paths} --dest {wheel_dir} --find-links {ourwheel_dir} " 
+        scmd = fr"{self.spec.python_dir}\python -E -m pipenv run pip download {setup_paths} --dest {wheel_dir} --find-links {ourwheel_dir} " 
         lines.append(fix_win_command(scmd))                
 
 
         scmd = fr"""
-for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
+for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe  -E  -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
 del {wheel_dir}\*.tar.*
 """ 
         lines.append(scmd)                
@@ -877,7 +884,7 @@ rmdir /S /Q  {relwheelpath}
                 scmd = "pushd %s" % (path_to_dir)
                 lines.append(scmd)
                 relwheelpath = os.path.relpath(wheelpath, start=path_to_dir)
-                scmd = fr"{python_dir}\python -m pipenv run python setup.py bdist_wheel -d {relwheelpath}" 
+                scmd = fr"{python_dir}\python -E -m pipenv run python setup.py bdist_wheel -d {relwheelpath}" 
                 lines.append(fix_win_command(scmd))                
                 lines.append('popd')
             pass
