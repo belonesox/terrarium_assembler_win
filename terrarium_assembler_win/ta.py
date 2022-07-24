@@ -231,9 +231,9 @@ set mi=%CurDate:~10,2%
 set ss=%CurDate:~12,2%
 set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 
-mkdir tmp/snaphots-src
-snapshotdir=tmp/snaphots-src/snapshot-src-before-%datestr%
-move in/src %snapshotdir%
+mkdir tmp\snaphots-src
+snapshotdir=tmp\snaphots-src\snapshot-src-before-%datestr%
+move in\src %snapshotdir%
 """)
 
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
