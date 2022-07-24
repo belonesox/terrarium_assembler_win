@@ -219,6 +219,23 @@ set PYTHONHOME=%TA_python_dir%
         lines.append(lfs_install)
         lines2.append(lfs_install)
 
+        # lines.add("rm -rf %s " % in_src)
+        lines.append(f"""
+for /f "skip=1" %%x in ('wmic os get localdatetime') do if not defined CurDate set CurDate=%%x
+echo %CurDate%
+set yyyy=%CurDate:~0,4%
+set mm=%CurDate:~4,2%
+set dd=%CurDate:~6,2%
+set hh=%CurDate:~8,2%
+set mi=%CurDate:~10,2%
+set ss=%CurDate:~12,2%
+set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
+
+mkdir tmp/snaphots-src
+snapshotdir=tmp/snaphots-src/snapshot-src-before-%datestr%
+move in/src %snapshotdir%
+""")
+
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
         lines.append(f'mkdir {in_src} ')
         already_checkouted = set()
@@ -427,7 +444,9 @@ C:\Windows\Microsoft.NET\Framework\v4.0.30319\jsc /out:{outfile}  {infile}
                     folder_ = path_to_dir_
                     if isinstance(build, dict) and 'folder' in build:
                         folder_ = os.path.join(folder_, build.folder)
-                    projectfile_ = build.projfile
+                    projectfile_ = projname_ + '.sln'    
+                    if 'projfile' in build:
+                        projectfile_ = build.projfile
                     projectname_ = os.path.splitext(projectfile_)[0]
 
                     lines.append(R"""
