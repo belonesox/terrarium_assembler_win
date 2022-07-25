@@ -114,6 +114,7 @@ class TerrariumAssembler:
         ap.add_argument('--stage-all', default='', type=str, help='Install, build and pack')
         ap.add_argument('--stage-pack', default='', type=str, help='Stage pack to given destination directory')
         ap.add_argument('--folder-command', default='', type=str, help='Perform some shell command for all projects')
+        ap.add_argument('--git-sync', default='', type=str, help='Perform lazy git sync for all projects')
         ap.add_argument('specfile', type=str, help='Specification File')
         
         self.args = args = ap.parse_args()
@@ -231,8 +232,8 @@ set mi=%CurDate:~10,2%
 set ss=%CurDate:~12,2%
 set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 
-mkdir tmp\snaphots-src
-snapshotdir=tmp\snaphots-src\snapshot-src-before-%datestr%
+mkdir tmp\snapshots-src
+set snapshotdir=tmp\snapshots-src\snapshot-src-before-%datestr%
 move in\src %snapshotdir%
 """)
 
@@ -790,13 +791,19 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
             if os.path.exists(setup_path):
                 os.chdir(setup_path)
                 is_python_package = False
-                for file_ in ['setup.py', 'pyproject.toml', 'requirements.txt']:
+                for file_ in ['setup.py', 'pyproject.toml']:
                     if os.path.exists(file_):
                         is_python_package = True
                         break
 
                 if is_python_package:
                     paths_.append(path_)
+
+                for file_ in ['requirements.txt']:
+                    if os.path.exists(file_):
+                        paths_.append(fr' -r {setup_path}\{file_}')
+                        break
+
 
             pass
 
@@ -1002,6 +1009,37 @@ rmdir /S /Q  {relwheelpath}
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
         already_checkouted = set()
 
+        print(f'Running command «{self.args.folder_command}» on all project paths')    
+        for git_url, td_ in self.spec.projects.items():
+            git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
+            if path_to_dir_ not in already_checkouted:
+                probably_package_name = os.path.split(path_to_dir_)[-1]
+                already_checkouted.add(path_to_dir_)
+                path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
+
+                if os.path.exists(path_to_dir):
+                    print(f'Running command on path «{path_to_dir}»')    
+                    os.chdir(path_to_dir)
+                    os.system(self.args.folder_command)
+                    os.chdir(self.curdir)
+                else:
+                    print(f'Cannot find path {path_to_dir}')    
+
+    def git_sync(self):
+        '''
+         Performing lazy git sync all project folders
+         * get last git commit message (usially link to issue)
+         * commit with same message
+         * pull-merge (without rebase)
+         * push to same branch
+        '''
+
+        if "projects" not in self.spec:
+            return
+
+        in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
+        already_checkouted = set()
+
         for git_url, td_ in self.spec.projects.items():
             git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
             if path_to_dir_ not in already_checkouted:
@@ -1010,7 +1048,15 @@ rmdir /S /Q  {relwheelpath}
                 path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
 
                 os.chdir(path_to_dir)
-                os.system(self.args.folder_command)
+                print(f'''\nSyncing project "{path_to_dir}"''')
+                last_commit_message = subprocess.check_output("git log -1 --pretty=%B", shell=True).decode("utf-8")
+                last_commit_message = last_commit_message.strip('"')
+                last_commit_message = last_commit_message.strip("'")
+                if not last_commit_message.startswith("Merge branch"):
+                    os.system(f'''git commit -am "{last_commit_message}" ''')
+                os.system(f'''git pull --rebase=false ''')
+                if 'out' in self.args.git_sync:
+                    os.system(f'''git push origin ''')
                 os.chdir(self.curdir)
 
     def pack_me(self): 
@@ -1135,6 +1181,10 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
 
         if self.args.folder_command:
             self.folder_command()
+            return
+
+        if self.args.git_sync:
+            self.git_sync()
             return
 
         if self.args.stage_pack_me:
