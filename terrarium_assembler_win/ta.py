@@ -813,6 +813,10 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
         scmd = fr"{self.spec.python_dir}\python -E -m pipenv run pip download {setup_paths} --dest {wheel_dir} --find-links {ourwheel_dir} " 
         lines.append(fix_win_command(scmd))                
 
+        if 'remove_python_packages_from_download' in self.spec:
+            for package_ in self.spec.remove_python_packages_from_download:
+                scmd = f'''del /Q {wheel_dir}\{package_}-*  '''        
+                lines.append(scmd)                
 
         scmd = fr"""
 for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe  -E  -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
