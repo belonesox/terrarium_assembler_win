@@ -743,6 +743,8 @@ echo "%pyyyy%-%pmm%-%pdd%"
 {python_dir}\python.exe -E -m pipenv run python make-iso.py
 @echo ;MD5: >> out/%changelogfilename%
 md5sums out/%isofilename% >> out/%changelogfilename%
+del /Q out\last.iso
+cmd /c "mklink /H out\last.iso out\%isofilename%"
 """
         self.lines2bat("51-make-iso", [scmd], 'make-iso')
         pass
