@@ -650,9 +650,9 @@ type nul > ta-sandbox.wsb
 
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far md5sums
+choco install -y far md5sums procmon git windirstat winmerge vscode anydesk 
 choco install -y --allow-downgrade wget --version 1.20.3.20190531
-rem choco install -y procmon git windirstat md5sums
+rem choco install -y procmon git windirstat md5sums vscode anydesk 
 rem choco install -y --allow-downgrade wget --version 1.20.3.20190531
 """
         self.lines2bat("99-install-tools", [scmd])
