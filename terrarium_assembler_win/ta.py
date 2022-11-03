@@ -688,7 +688,7 @@ venv_path = os.environ["VIRTUAL_ENV"]
 isofilename = os.environ["isofilename"]
 
 scmd = fr'''
-{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -joliet -joliet-long -o out/{isofilename} out/iso
+{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -U -iso-level 4 -R -o out/{isofilename} out/iso
 '''
 print(scmd)
 os.system(scmd)
