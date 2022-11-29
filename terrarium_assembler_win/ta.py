@@ -937,6 +937,12 @@ rmdir /S /Q  {relwheelpath}
         #     scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --ignore-installed  %s ' % p_
         #     lines.append(fix_win_command(scmd))
 
+        lines.append(fr'''
+del /Q Pipfile
+{python_dir}\python -E -m pipenv --rm
+{python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe        
+        ''')
+
         scmd = fr'{self.spec.python_dir}/python -m pipenv run python install-all-wheels.py {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
         lines.append(fix_win_command(scmd))
 
