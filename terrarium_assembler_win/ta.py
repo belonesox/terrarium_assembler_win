@@ -218,7 +218,7 @@ set PYTHONHOME=%TA_python_dir%
         # Install git lfs for user (need once)
         lfs_install = 'git lfs install'
         lines.append(lfs_install)
-        lines2.append(lfs_install)
+        # lines2.append(lfs_install)
 
         # lines.add("rm -rf %s " % in_src)
         lines.append(f"""
@@ -244,7 +244,7 @@ move in\src %snapshotdir%
         for git_url, td_ in self.spec.projects.items():
             git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
             if path_to_dir_ not in already_checkouted:
-                probably_package_name = os.path.split(path_to_dir_)[-1]
+                # probably_package_name = os.path.split(path_to_dir_)[-1]
                 already_checkouted.add(path_to_dir_)
                 path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
                 newpath = path_to_dir + '.new'
@@ -260,13 +260,17 @@ popd
 
                 lines2.append(f'''
 pushd "{path_to_dir}"
-git config core.fileMode false
-git pull
-git lfs pull
-{self.spec.python_dir}\python -E -m pipenv run pip uninstall  {probably_package_name} -y
-{self.spec.python_dir}\python -E -m pipenv run python setup.py develop
+if exist setup.py (
+
+FOR /F %%i IN ('..\..\..\.venv\Scripts\python.exe setup.py --name') DO set PACKAGE=%%i
+..\..\..\.venv\Scripts\python.exe -m pip uninstall %PACKAGE% -y
+..\..\..\.venv\Scripts\python.exe setup.py develop
+
+)
 popd
+
 ''')
+# ..\..\..\.venv\Scripts\python.exe -m pip uninstall  {probably_package_name} -y
 
 
                 # Fucking https://www.virtualbox.org/ticket/19086 + https://www.virtualbox.org/ticket/8761
@@ -278,7 +282,7 @@ if exist "{newpath}\" (
 """)
 
         self.lines2bat("06-checkout", lines, 'checkout')    
-        self.lines2bat("96-pullall", lines2)    
+        self.lines2bat("96-developmode", lines2)    
         pass
 
     def get_all_sources(self):
