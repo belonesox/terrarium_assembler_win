@@ -939,8 +939,8 @@ rmdir /S /Q  {relwheelpath}
 
         lines.append(fr'''
 del /Q Pipfile
-{python_dir}\python -E -m pipenv --rm
-{python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe        
+{self.spec.python_dir}\python -E -m pipenv --rm
+{self.spec.python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe        
         ''')
 
         scmd = fr'{self.spec.python_dir}/python -m pipenv run python install-all-wheels.py {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
@@ -950,7 +950,7 @@ del /Q Pipfile
         lines.append(fix_win_command(scmd))
 
         if 'pipenv_shell_commands' in self.spec:
-            for scmd in self.spec.pipenv_shell_commands:
+            for scmd in self.spec.pipenv_shell_commands or []:
                 lines.append(fix_win_command(scmd))
 
         self.lines2bat("15-install-wheels", lines, "install-wheels")
