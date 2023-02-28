@@ -68,7 +68,6 @@ class TerrariumAssembler:
     
     def __init__(self):
         self.curdir = os.getcwd()
-        self.output_dir = os.path.join(self.curdir, 'out')        
         self.root_dir = None
         # self.buildroot_dir = 'C:/docmarking-buildroot'
         self.ta_name = 'terrarium_assembler'
@@ -149,6 +148,10 @@ class TerrariumAssembler:
         self.root_dir = os.path.split(specfile_)[0]
         os.environ['TERRA_SPECDIR'] = os.path.split(specfile_)[0]
         self.spec, self.tvars = yaml_load(specfile_, vars_)    
+        self.out_dir = 'out'
+        if "out_dir" in self.spec:
+            self.out_dir = self.spec.out_dir 
+        self.output_dir = os.path.join(self.curdir, self.out_dir)        
         self.start_dir = os.getcwd()
         pass
 
@@ -490,7 +493,7 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
         for b_ in bfiles:
             lines.append("echo ***********Building " + b_ + ' **************\n\r')
             lines.append("CMD /C " + b_ + '.bat' + '\n\r')
-        self.lines2bat("40-build-projects", lines, "build-projects")
+        self.lines2bat(f"40-build-projects-{self.out_dir}", lines, "build-projects")
         pass
 
 
@@ -694,29 +697,29 @@ venv_path = os.environ["VIRTUAL_ENV"]
 isofilename = os.environ["isofilename"]
 
 scmd = fr'''
-{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -U -iso-level 4 -R -o out/{isofilename} out/iso
+{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -U -iso-level 4 -R -o {self.output_dir}/{isofilename} {self.output_dir}/iso
 '''
 print(scmd)
 os.system(scmd)
 """)
 
 
-        scmd = R"""
+        scmd = fR"""
 call 02-install-utilities.bat 
 call 15-install-wheels.bat
 call 09-build-wheels.bat
 call 15-install-wheels.bat
-call 40-build-projects.bat
-call 50-output.bat
-call 51-make-iso.bat
+call 40-build-projects-{self.out_dir}.bat
+call 50-output-{self.out_dir}.bat
+call 51-make-iso-{self.out_dir}.bat
 """
         self.lines2bat("98-install-and-build-for-audit", [scmd])
 
         lines_ = []
         for git_url, git_branch, path_to_dir_ in self.get_all_sources():
             lines_.append(f'''
-@echo ---- Changelog for {path_to_dir_} >> out/%changelogfilename%
-git -C {path_to_dir_} log --since="%pyyyy%-%pmm%-%pdd%" --pretty --name-status   >> out/%changelogfilename%
+@echo ---- Changelog for {path_to_dir_} >> {self.output_dir}/%changelogfilename%
+git -C {path_to_dir_} log --since="%pyyyy%-%pmm%-%pdd%" --pretty --name-status   >> {self.output_dir}/%changelogfilename%
             ''')
         changelog_mode = "\n".join(lines_)
 
@@ -736,9 +739,8 @@ set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 set isoprefix=%datestr%-dm-win-distr
 set isofilename=%isoprefix%.iso
 set changelogfilename=%isoprefix%.changelog.txt
-echo %isofilename% > out/iso/isodistr.txt
-rem for /f "tokens=*" %%i in ('dir /b /o:n "out\*.iso"') do @echo %%~ni >> names.txt
-for /f "tokens=*" %%i in ('dir /b /o:n "out\*.iso"') do set lastiso=%%~ni 
+echo %isofilename% > {self.output_dir}/iso/isodistr.txt
+for /f "tokens=*" %%i in ('dir /b /o:n "{self.output_dir}\*.iso"') do set lastiso=%%~ni 
 set /a "pyyyy=%yyyy%-1"
 if not defined lastiso set lastiso=%pyyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 set pyyyy=%lastiso:~0,4%
@@ -747,12 +749,12 @@ set pdd=%lastiso:~8,2%
 echo "%pyyyy%-%pmm%-%pdd%"
 {changelog_mode}
 {python_dir}\python.exe -E -m pipenv run python make-iso.py
-@echo ;MD5: >> out/%changelogfilename%
-md5sums out/%isofilename% >> out/%changelogfilename%
-del /Q out\last.iso
-cmd /c "mklink /H out\last.iso out\%isofilename%"
+@echo ;MD5: >> {self.output_dir}/%changelogfilename%
+md5sums {self.output_dir}/%isofilename% >> {self.output_dir}/%changelogfilename%
+del /Q {self.output_dir}\last.iso
+cmd /c "mklink /H {self.output_dir}\last.iso out\%isofilename%"
 """
-        self.lines2bat("51-make-iso", [scmd], 'make-iso')
+        self.lines2bat(f"51-make-iso-{self.out_dir}", [scmd], 'make-iso')
         pass
 
 
@@ -1148,7 +1150,7 @@ mkdir {dst_folder}
                 lines.append(fR"""    
 echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
     """)
-        self.lines2bat('50-output', lines, 'output')
+        self.lines2bat(f'50-output-{self.out_dir}', lines, 'output')
         pass    
 
     def gen_docs(self):
