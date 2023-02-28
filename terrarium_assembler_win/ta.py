@@ -93,6 +93,7 @@ class TerrariumAssembler:
             'checkout' : 'checkout sources',
             'install-utilities': 'install downloaded utilities',
             'init-env': 'install environment',
+            'download-base-wheels': 'download base WHL-python packages',
             'download-wheels': 'download needed WHL-python packages',
             'build-conanlibs': 'compile conan libraries',
             'build-wheels': 'compile wheels for our python sources',
@@ -123,6 +124,7 @@ class TerrariumAssembler:
 
         if self.args.stage_build_and_pack:
             self.args.stage_install_utilities = True
+            self.args.stage_download_base_wheels = True
             self.args.stage_init_env = True
             self.args.stage_build_wheels = True
             self.args.stage_install_wheels = True
@@ -143,6 +145,7 @@ class TerrariumAssembler:
             self.args.stage_download_rpms = True
             self.args.stage_checkout = True
             self.args.stage_download_wheels = True
+            self.args.stage_download_base_wheels = True
 
         specfile_  = expandpath(args.specfile)
         self.root_dir = os.path.split(specfile_)[0]
@@ -615,6 +618,7 @@ set PATH={to_};%PATH%'''.split('\n')
 del /Q Pipfile
 {python_dir}\python -E -m pipenv --rm
 {python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe        
+{python_dir}\python -E -m pipenv run pip install {self.spec.basewheel_dir}\*.whl
         ''')
 
         self.lines2bat("05-init-env", lines, "init-env")    
@@ -707,7 +711,8 @@ os.system(scmd)
 
         scmd = fR"""
 call 02-install-utilities.bat 
-call 15-install-wheels.bat
+call 04-download-base-wheels.bat 
+call 05-init-env.bat 
 call 09-build-wheels.bat
 call 15-install-wheels.bat
 call 40-build-projects-{self.out_dir}.bat
@@ -757,6 +762,49 @@ cmd /c "mklink /H {self.out_dir}\last.iso {self.out_dir}\%isofilename%"
 """
         self.lines2bat(f"51-make-iso-{self.out_dir}", [scmd], 'make-iso')
         pass
+
+
+    def generate_download_base_wheels(self):
+        '''
+        Генерация скачивания всех питон-пакетов с фиксированными зависимостями.
+        '''
+        os.chdir(self.curdir)
+
+        root_dir = self.root_dir
+        args = self.args
+
+        lines = []
+        wheel_dir = self.spec.basewheel_dir.replace("/", "\\")
+        lines.append(fr'''
+del /q {wheel_dir}\*     
+set CONAN_USER_HOME=%~dp0in\libscon
+set CONANROOT=%CONAN_USER_HOME%\.conan\data
+''')
+
+        paths_ = []
+        for pp in self.spec.python_packages:
+            if '==' in pp:
+                paths_.append(pp)
+
+        os.chdir(self.curdir)
+        setup_paths = " ".join(paths_)        
+
+        scmd = fr"{self.spec.python_dir}\python -m pip download {setup_paths} --dest {wheel_dir} " 
+        lines.append(fix_win_command(scmd))                
+
+        if 'remove_python_packages_from_download' in self.spec:
+            for package_ in self.spec.remove_python_packages_from_download:
+                scmd = f'''del /Q {wheel_dir}\{package_}-*  '''        
+                lines.append(scmd)                
+
+        scmd = fr"""
+for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe  -E  -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
+del {wheel_dir}\*.tar.*
+""" 
+        lines.append(scmd)                
+
+        self.lines2bat("04-download-base-wheels", lines, "download-base-wheels")
+        pass    
 
 
     def generate_download_wheels(self):
@@ -836,7 +884,7 @@ del {wheel_dir}\*.tar.*
         lines.append(scmd)                
 
         self.lines2bat("09-download-wheels", lines, "download-wheels")
-        pass    
+        pass  
 
 
     def generate_build_conanlibs(self):
@@ -1216,6 +1264,7 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
 
         self.generate_download()
         self.generate_install()
+        self.generate_download_base_wheels()
         self.generate_init_env()
         self.generate_checkout_sources()
         self.generate_download_wheels()
