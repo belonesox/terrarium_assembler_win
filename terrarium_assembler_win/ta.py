@@ -22,6 +22,7 @@ import csv
 from .wheel_utils import parse_wheel_filename
 from .utils import *
 from .nuitkaflags import *
+from pathlib import Path, PurePath
 
 
 def write_doc_table(filename, headers, rows):
@@ -86,66 +87,118 @@ class TerrariumAssembler:
         ap.add_argument('--debug', default=False, action='store_true', help='Debug version of release')
         ap.add_argument('--docs', default=False, action='store_true', help='Output documentation version')
 
-        # Основные этапы сборки
-        self.stages = {
-            'download-utilities' : 'download binary files',
-            # 'download-msvc' : 'download MSVC versions',
-            'checkout' : 'checkout sources',
-            'install-utilities': 'install downloaded utilities',
-            'init-env': 'install environment',
-            'download-base-wheels': 'download base WHL-python packages',
-            'download-wheels': 'download needed WHL-python packages',
-            'build-conanlibs': 'compile conan libraries',
-            'build-wheels': 'compile wheels for our python sources',
-            'install-wheels': 'Install our and external Python wheels',
-            'build-projects': 'Compile Python packages to executable',
-            'pack_me' :  'Pack current dir to time prefixed tar.bz2',
-            'output' :   'Generate «out» for ditribution',
-            'gen-docs' : 'Generate docs about sources/packages',
-            'make-iso': 'Make ISO disk from distribution',
-        }
+        # # Основные этапы сборки
+        # self.stages = {
+        #     # 'download-utilities' : 'download binary files',
+        #     # 'download-msvc' : 'download MSVC versions',
+        #     'checkout' : 'checkout sources',
+        #     'install-utilities': 'install downloaded utilities',
+        #     'init-env': 'install environment',
+        #     'download-base-wheels': 'download base WHL-python packages',
+        #     'download-wheels': 'download needed WHL-python packages',
+        #     'build-conanlibs': 'compile conan libraries',
+        #     'build-wheels': 'compile wheels for our python sources',
+        #     'install-wheels': 'Install our and external Python wheels',
+        #     'build-projects': 'Compile Python packages to executable',
+        #     'pack_me' :  'Pack current dir to time prefixed tar.bz2',
+        #     'output' :   'Generate «out» for ditribution',
+        #     'gen-docs' : 'Generate docs about sources/packages',
+        #     'make-iso': 'Make ISO disk from distribution',
+        # }
+
+        # for stage, desc in self.stages.items():
+        #     ap.add_argument('--stage-%s' % stage, default=False, action='store_true', help='Stage for %s ' % desc)
+
+        self.stages_names = sorted([method_name for method_name in dir(self) if method_name.startswith('stage_')])
+        self.stage_methods = [getattr(self, stage_) for stage_ in self.stages_names]
+
+        self.stages = {}
+        for s_, sm_ in zip(self.stages_names, self.stage_methods):
+            self.stages[fname2stage(s_)] = sm_.__doc__.strip() 
 
         for stage, desc in self.stages.items():
-            ap.add_argument('--stage-%s' % stage, default=False, action='store_true', help='Stage for %s ' % desc)
+            ap.add_argument(f'--{fname2option(stage)}', default=False,
+                            action='store_true', help=f'{desc}')
 
-        ap.add_argument('--stage-build-and-pack', default='', type=str, help='Install, build and pack')
-        ap.add_argument('--stage-download-all', default=False, action='store_true', help='Download all — sources, packages')
-        ap.add_argument('--stage-my-source-changed', default='', type=str, help='Fast rebuild/repack if only pythonsourcechanged')
-        ap.add_argument('--stage-all', default='', type=str, help='Install, build and pack')
-        ap.add_argument('--stage-pack', default='', type=str, help='Stage pack to given destination directory')
+
+        # ap.add_argument('--stage-build-and-pack', default='', type=str, help='Install, build and pack')
+        # ap.add_argument('--stage-download-all', default=False, action='store_true', help='Download all — sources, packages')
+        # ap.add_argument('--stage-my-source-changed', default='', type=str, help='Fast rebuild/repack if only pythonsourcechanged')
+        # ap.add_argument('--stage-all', default='', type=str, help='Install, build and pack')
+        # ap.add_argument('--stage-pack', default='', type=str, help='Stage pack to given destination directory')
         ap.add_argument('--folder-command', default='', type=str, help='Perform some shell command for all projects')
         ap.add_argument('--git-sync', default='', type=str, help='Perform lazy git sync for all projects')
+        ap.add_argument('--steps', type=str, default='', help='Steps like page list or intervals')
+        ap.add_argument('--skip-words', type=str, default='', help='Skip steps that contain these words (comma, separated)')
         ap.add_argument('specfile', type=str, help='Specification File')
         
+        
+        complex_stages = {
+            "stage-all": lambda stage: fname2num(stage)<60 and not 'audit' in stage,
+            "stage-rebuild": lambda stage: fname2num(stage)<60 and not 'checkout' in stage and not 'download' in stage and not 'audit' in stage,
+        }
+        
+        for cs_, filter_ in complex_stages.items():
+            desc = []
+            selected_stages_ = [fname2stage(s_).replace('_', '-') for s_ in self.stages_names if filter_(s_)]
+            desc = ' + '.join(selected_stages_)
+            ap.add_argument(f'--{cs_}', default=False, action='store_true', help=f'{desc}')
+        
+        
         self.args = args = ap.parse_args()
-        if self.args.stage_all:
-            self.args.stage_build_and_pack = self.args.stage_all
-            self.args.stage_download_all = True
+        # if self.args.stage_all:
+        #     self.args.stage_build_and_pack = self.args.stage_all
+        #     self.args.stage_download_all = True
 
-        if self.args.stage_build_and_pack:
-            self.args.stage_install_utilities = True
-            self.args.stage_download_base_wheels = True
-            self.args.stage_init_env = True
-            self.args.stage_build_wheels = True
-            self.args.stage_install_wheels = True
-            self.args.stage_build_projects = True
-            self.args.stage_output = self.args.stage_build_and_pack
+        # if self.args.stage_build_and_pack:
+        #     self.args.stage_install_utilities = True
+        #     self.args.stage_download_base_wheels = True
+        #     self.args.stage_init_env = True
+        #     self.args.stage_build_wheels = True
+        #     self.args.stage_install_wheels = True
+        #     self.args.stage_build_projects = True
+        #     self.args.stage_output = self.args.stage_build_and_pack
 
-        if self.args.stage_my_source_changed:
-            self.args.stage_checkout = True
-            self.args.stage_download_wheels = True
-            self.args.stage_init_env = True
-            self.args.stage_build_wheels = True
-            self.args.stage_install_wheels = True
-            self.args.stage_build_projects = True
-            self.args.stage_output = self.args.stage_my_source_changed
-            self.args.stage_make_iso = True
+        # if self.args.stage_my_source_changed:
+        #     self.args.stage_checkout = True
+        #     self.args.stage_download_wheels = True
+        #     self.args.stage_init_env = True
+        #     self.args.stage_build_wheels = True
+        #     self.args.stage_install_wheels = True
+        #     self.args.stage_build_projects = True
+        #     self.args.stage_output = self.args.stage_my_source_changed
+        #     self.args.stage_make_iso = True
 
-        if self.args.stage_download_all:
-            self.args.stage_download_rpms = True
-            self.args.stage_checkout = True
-            self.args.stage_download_wheels = True
-            self.args.stage_download_base_wheels = True
+        # if self.args.stage_download_all:
+        #     self.args.stage_download_rpms = True
+        #     self.args.stage_checkout = True
+        #     self.args.stage_download_wheels = True
+        #     self.args.stage_download_base_wheels = True
+
+        if args.steps:
+            for step_ in args.steps.split(','):
+                if '-' in step_:
+                    sfrom, sto = step_.split('-')
+                    for s_ in self.stages_names:
+                        if int(sfrom) <= fname2num(s_) <= int(sto):
+                            setattr(self.args, fname2stage(s_).replace('-','_'), True)
+                else:
+                    for s_ in self.stages_names:
+                        if fname2num(s_) == int(step_):
+                            setattr(self.args, fname2stage(s_).replace('-','_'), True)
+
+        for cs_, filter_ in complex_stages.items():
+            if vars(self.args)[cs_.replace('-','_')]:
+                for s_ in self.stages_names:
+                    if filter_(s_):
+                        setattr(self.args, fname2stage(s_).replace('-','_'), True)
+
+        if args.skip_words:
+            for word_ in args.skip_words.split(','):
+                for s_ in self.stages_names:
+                    if word_ in s_:
+                        setattr(self.args, fname2stage(s_).replace('-','_'), False)
+
 
         specfile_  = expandpath(args.specfile)
         self.root_dir = os.path.split(specfile_)[0]
@@ -166,8 +219,28 @@ class TerrariumAssembler:
         '''
         import stat
         os.chdir(self.curdir)
-        fname = name + '.bat'
+        
+        fname = fname2shname(name)
+        if stage:
+            stage = fname2stage(stage)
 
+        if self.build_mode:
+            if stage:
+                option = stage.replace('-', '_')
+                dict_ = vars(self.args)
+                if option in dict_:
+                    if dict_[option]:
+                        print("*"*20)
+                        print("Executing ", fname)
+                        print("*"*20)
+                        res = self.cmd("./" + fname)
+                        failmsg = f'{fname} execution failed!'
+                        if res != 0:
+                            print(failmsg)
+                        assert res==0, 'Execution of stage failed!'
+            return
+            
+            
         with open(os.path.join(fname), 'w', encoding="utf-8") as lf:
             lf.write(f"rem Generated {name} \n")
             if stage:
@@ -196,23 +269,22 @@ set PYTHONHOME=%TA_python_dir%
         st = os.stat(fname)
         os.chmod(fname, st.st_mode | stat.S_IEXEC)
 
-        if stage:
-            param = stage.replace('-', '_')
-            option = "stage_" + param
-            dict_ = vars(self.args)
-            if option in dict_:
-                if dict_[option]:
-                    print("*"*20)
-                    print("Executing ", fname)
-                    print("*"*20)
-                    os.system(fname)
+        # if stage:
+        #     param = stage.replace('-', '_')
+        #     option = "stage_" + param
+        #     dict_ = vars(self.args)
+        #     if option in dict_:
+        #         if dict_[option]:
+        #             print("*"*20)
+        #             print("Executing ", fname)
+        #             print("*"*20)
+        #             os.system(fname)
         pass  
 
 
-    def generate_checkout_sources(self):
+    def stage_06_checkout(self):
         '''
-            Just checking out sources.
-            This stage should be done when we have authorization to check them out.
+            Checkout sources
         '''
         if "projects" not in self.spec:
             return
@@ -264,20 +336,20 @@ popd
 ''' 
                 lines.append(scmd)
 
-                lines2.append(f'''
-pushd "{path_to_dir}"
-set PACKAGE=
-if exist setup.py (
+#                 lines2.append(f'''
+# pushd "{path_to_dir}"
+# set PACKAGE=
+# if exist setup.py (
 
-FOR /F %%i IN ('..\..\..\.venv\Scripts\python.exe setup.py --name') DO set PACKAGE=%%i
-echo %PACKAGE%
-..\..\..\.venv\Scripts\python.exe -m pip uninstall %PACKAGE% -y
-..\..\..\.venv\Scripts\python.exe setup.py develop
+# FOR /F %%i IN ('..\..\..\.venv\Scripts\python.exe setup.py --name') DO set PACKAGE=%%i
+# echo %PACKAGE%
+# ..\..\..\.venv\Scripts\python.exe -m pip uninstall %PACKAGE% -y
+# ..\..\..\.venv\Scripts\python.exe setup.py develop
 
-)
-popd
+# )
+# popd
 
-''')
+# ''')
 # ..\..\..\.venv\Scripts\python.exe -m pip uninstall  {probably_package_name} -y
 
 
@@ -289,8 +361,9 @@ if exist "{newpath}\" (
 )
 """)
 
-        self.lines2bat("06-checkout", lines, 'checkout')    
-        self.lines2bat("96-developmode", lines2)    
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)    
+        # self.lines2bat("96-developmode", lines2)    
         pass
 
     def get_all_sources(self):
@@ -319,15 +392,16 @@ if exist "{newpath}\" (
         return git_url, git_branch, path_to_dir, setup_path
 
 
-    def generate_build_projects(self):
+    def stage_40_build_projects(self):
         '''
-        Генерация скриптов бинарной сборки для всех проектов.
+        Compile Python/C projects to executable
+        '''
+        # Генерация скриптов бинарной сборки для всех проектов.
 
-        Поддерживается сборка 
-        * компиляция проектов MVSC
-        * компиляция питон-проектов Nuitkой
-        * компиляция JS-проектов (обычно скриптов)
-        '''
+        # Поддерживается сборка 
+        # * компиляция проектов MVSC
+        # * компиляция питон-проектов Nuitkой
+        # * компиляция JS-проектов (обычно скриптов)
 
         if "projects" not in  self.spec:
             return
@@ -496,15 +570,19 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
         for b_ in bfiles:
             lines.append("echo ***********Building " + b_ + ' **************\n\r')
             lines.append("CMD /C " + b_ + '.bat' + '\n\r')
-        self.lines2bat(f"40-build-projects-{self.out_dir}", lines, "build-projects")
+        
+        mn_ = get_method_name()
+        # self.lines2sh(mn_, lines, mn_)
+        # !!!
+        # self.lines2bat(f"40-build-projects-{self.out_dir}", lines, "build-projects")
+        self.lines2bat(mn_, lines, mn_)
         pass
 
 
 
-    def generate_download(self):
+    def stage_01_download_utilities(self):
         '''
-        Генерация скачивания бинарных утилит. 
-        Практически всего необходимого, кроме зависимостей питон-пакетов, это отдельно.
+        Download binary utilities — compilers, etc
         '''
         root_dir = self.root_dir
         args = self.args
@@ -533,11 +611,16 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
         for name_, it_ in self.spec.download_and_install.items():
             if isinstance(it_, dict):
                 msvc_components = ''
+                # if name_ in ['wixtoolset', 'dependencywalker']:
+                #     wtf = 444
                 if 'download' in it_:
                     download_ = it_.download
                     if isinstance(download_, dict):
                         for to_, nd_ in download_.items():
                             download_to(nd_, to_)
+                    # elif isinstance(download_, str):
+                    #     download_to(nd_, to_)
+                                
                 if 'components' in it_:
                     msvc_components = " ".join(["--add " + comp for comp in it_.components])
                 if 'postdownload' in it_:
@@ -545,14 +628,14 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
                     scmd = fix_win_command(scmd)
                     lines.append(scmd)
 
-        self.lines2bat("01-download-utilities", lines, "download-utilities")    
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)
         pass
 
 
-    def generate_install(self):
+    def stage_02_install_utilities(self):
         '''
-        Генерация командного скрипта установки всего скачанного,
-        кроме питон-пакетов.
+        install downloaded utilities
         '''
         root_dir = self.root_dir
         args = self.args
@@ -599,13 +682,14 @@ set PATH={to_};%PATH%'''.split('\n')
                         scmd = line_.format(**vars())
                         lines.append(fix_win_command(scmd))
 
-        self.lines2bat("02-install-utilities", lines, "install-utilities")    
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)    
         pass
 
 
-    def generate_init_env(self):
+    def stage_05_init_env(self):
         '''
-        Генерация командного скрипта инсталляции pipenv-энвайромента
+        Create python environment
         '''
         root_dir = self.root_dir
         args = self.args
@@ -621,7 +705,8 @@ del /Q Pipfile
 {python_dir}\python -E -m pipenv run pip install {self.spec.basewheel_dir}\*.whl
         ''')
 
-        self.lines2bat("05-init-env", lines, "init-env")    
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)    
         pass
 
     def write_sandbox(self):
@@ -764,9 +849,9 @@ cmd /c "mklink /H {self.out_dir}\last.iso {self.out_dir}\%isofilename%"
         pass
 
 
-    def generate_download_base_wheels(self):
+    def stage_04_download_base_wheels(self):
         '''
-        Генерация скачивания всех питон-пакетов с фиксированными зависимостями.
+        Download base wheel python packages
         '''
         os.chdir(self.curdir)
 
@@ -803,13 +888,14 @@ del {wheel_dir}\*.tar.*
 """ 
         lines.append(scmd)                
 
-        self.lines2bat("04-download-base-wheels", lines, "download-base-wheels")
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)
         pass    
 
 
-    def generate_download_wheels(self):
+    def stage_09_download_wheels(self):
         '''
-        Генерация скачивания всех пакетов по зависимостям.
+        Download needed WHL-python packages
         '''
         os.chdir(self.curdir)
 
@@ -883,13 +969,14 @@ del {wheel_dir}\*.tar.*
 """ 
         lines.append(scmd)                
 
-        self.lines2bat("09-download-wheels", lines, "download-wheels")
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)
         pass  
 
 
-    def generate_build_conanlibs(self):
+    def stage_07_build_conanlibs(self):
         '''
-        Генерация сборки конан пакетов
+        Compile conan libraries
         '''
         os.chdir(self.curdir)
         lines = []
@@ -931,13 +1018,15 @@ conan remove  --locks
             lines.append(fix_win_command(scmd))                
             lines.append('popd')
             pass
-        self.lines2bat("07-build-conanlibs", lines, "build-conanlibs")
+
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)
         pass
 
 
-    def generate_build_wheels(self):
+    def stage_08_build_wheels(self):
         '''
-        Генерация сборки пакетов по всем нашим питон модулям.
+        Сompile wheels for our python sources
         '''
         os.chdir(self.curdir)
         lines = []
@@ -977,10 +1066,14 @@ rmdir /S /Q  {relwheelpath}
                 lines.append(fix_win_command(scmd))                
                 lines.append('popd')
             pass
-        self.lines2bat("08-build-wheels", lines, "build-wheels")
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)
         pass
 
-    def generate_install_wheels(self):
+    def stage_15_install_wheels(self):
+        '''
+        Install our and external Python wheels
+        '''
         os.chdir(self.curdir)
 
         lines = []
@@ -1010,7 +1103,8 @@ del /Q Pipfile
             for scmd in self.spec.pipenv_shell_commands or []:
                 lines.append(fix_win_command(scmd))
 
-        self.lines2bat("15-install-wheels", lines, "install-wheels")
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)
         pass    
 
 
@@ -1174,7 +1268,10 @@ del /Q Pipfile
     #     tar.close()    
 
 
-    def generate_output(self):
+    def stage_50_output(self):
+        '''
+        Generate «out» for ditribution        
+        '''
         lines = []
         output_ = self.spec.output
         out_dir = output_.distro_dir.replace('/', '\\')
@@ -1199,7 +1296,9 @@ mkdir {dst_folder}
                 lines.append(fR"""    
 echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
     """)
-        self.lines2bat(f'50-output-{self.out_dir}', lines, 'output')
+        # self.lines2bat(f'50-output-{self.out_dir}', lines, 'output')
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines, mn_)
         pass    
 
     def gen_docs(self):
@@ -1239,6 +1338,13 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
             write_doc_table('doc-cloc.htm', ['Файлов', 'Язык', 'Пустых', 'Комментариев', 'Строчек кода', 'Мощность языка', 'COCOMO строк'], 
                             table_csv)        
 
+    def clear_shell_files(self):
+        os.chdir(self.curdir)
+        re_ = re.compile('(\d\d-|ta-).*\.(bat)')
+        for sh_ in Path(self.curdir).glob('*.*'):
+            if re_.match(sh_.name):
+                sh_.unlink()
+        pass        
 
 
     def process(self):
@@ -1256,23 +1362,35 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
             self.git_sync()
             return
 
-        if self.args.stage_pack_me:
-            self.pack_me()
-            return
+        # if self.args.stage_pack_me:
+        #     self.pack_me()
+        #     return
 
-        self.gen_docs()
+        # !!! Разобраться, засунуть в стейдж.
+        # self.gen_docs()
 
-        self.generate_download()
-        self.generate_install()
-        self.generate_download_base_wheels()
-        self.generate_init_env()
-        self.generate_checkout_sources()
-        self.generate_download_wheels()
-        self.generate_build_conanlibs()
-        for _ in range(2):
-            self.generate_build_wheels()
-            self.generate_install_wheels()
-        self.generate_build_projects()
-        self.generate_output()
+
+        self.build_mode = False
+        self.clear_shell_files()
+        for stage_ in self.stage_methods:
+            stage_()
+
+        self.build_mode = True
+        for stage_ in self.stage_methods:
+            stage_()
+
+
+        # self.generate_download()
+        # self.generate_install()
+        # self.generate_download_base_wheels()
+        # self.generate_init_env()
+        # self.generate_checkout_sources()
+        # self.generate_download_wheels()
+        # self.generate_build_conanlibs()
+        # for _ in range(2):
+            # self.generate_build_wheels()
+            # self.generate_install_wheels()
+        # self.generate_build_projects()
+        # self.generate_output()
         self.write_sandbox()
         pass

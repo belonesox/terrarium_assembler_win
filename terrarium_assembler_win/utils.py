@@ -10,6 +10,31 @@ from easydict import EasyDict as edict
 # from jinja2 import Template, Undefined
 from jinja2 import Environment, FileSystemLoader, Template, Undefined, DebugUndefined
 # from elevate import elevate
+import inspect
+import re
+
+
+def fname2stage(fname):
+    return re.sub(r'''\d\d\_''', '', fname)
+
+def fname2shname(fname):
+    ext = '.bat'
+    return 'ta-' + fname.replace('stage_','').replace('_', '-') + ext
+
+def fname2num(fname):
+    for m in re.findall(r'''\d\d''', fname):
+        return int(m)
+    return None
+
+def fname2option(fname):
+    return re.sub(r'''_''', '-', fname)
+
+
+def get_method_name():
+    curframe = inspect.currentframe().f_back
+    (filename, line_number, function_name, lines, index) = inspect.getframeinfo(curframe)        
+    return function_name
+
 
 def mkdir_p(path):
     pathlib.Path(path).mkdir(parents=True, exist_ok=True)
