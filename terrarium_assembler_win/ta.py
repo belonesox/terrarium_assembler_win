@@ -134,8 +134,8 @@ class TerrariumAssembler:
         
         
         complex_stages = {
-            "stage-all": lambda stage: fname2num(stage)<60 and not 'audit' in stage,
-            "stage-rebuild": lambda stage: fname2num(stage)<60 and not 'checkout' in stage and not 'download' in stage and not 'audit' in stage,
+            "stage-all": lambda stage: fname2num(stage)>0 and fname2num(stage)<60 and not 'audit' in stage,
+            "stage-rebuild": lambda stage: fname2num(stage)>0 and fname2num(stage)<60 and not 'checkout' in stage and not 'download' in stage and not 'audit' in stage,
         }
         
         for cs_, filter_ in complex_stages.items():
@@ -209,7 +209,21 @@ class TerrariumAssembler:
             self.out_dir = self.spec.out_dir 
         self.output_dir = os.path.join(self.curdir, self.out_dir)        
         self.start_dir = os.getcwd()
+        
+        self.svace_mod = False
+        self.svace_path = fr'app\svace\bin\svace.exe'
+        if Path(self.svace_path).exists():
+            self.svace_mod = True
+        
         pass
+
+    def cmd(self, scmd):
+        '''
+        Print command and perform it.
+        May be here we will can catch output and hunt for heizenbugs
+        '''
+        print(scmd)
+        return os.system(scmd)
 
     def lines2bat(self, name, lines, stage=None):
         '''
@@ -233,7 +247,7 @@ class TerrariumAssembler:
                         print("*"*20)
                         print("Executing ", fname)
                         print("*"*20)
-                        res = self.cmd("./" + fname)
+                        res = self.cmd(fname)
                         failmsg = f'{fname} execution failed!'
                         if res != 0:
                             print(failmsg)
@@ -263,8 +277,19 @@ for /f %%i in ('{self.spec.python_dir}\python -E -m pipenv --venv') do set TA_PI
             lf.write(f'''
 set PYTHONHOME=%TA_python_dir%
 ''')
-            lf.write("\n".join(lines))
+            for lines_ in lines:
+                for line_ in lines_.split('\n'):
+                    if line_:
+                        lf.write(f'''{line_}\n''')
+                        lf.write(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
+            
+            lf.write(f'''
+goto :EOF
 
+:error
+echo Failed with error #%errorlevel%.
+exit /b %errorlevel%
+''')
 
         st = os.stat(fname)
         os.chmod(fname, st.st_mode | stat.S_IEXEC)
@@ -310,13 +335,13 @@ set mi=%CurDate:~10,2%
 set ss=%CurDate:~12,2%
 set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 
-mkdir tmp\snapshots-src
+if not exist tmp\snapshots-src mkdir tmp\snapshots-src
 set snapshotdir=tmp\snapshots-src\snapshot-src-before-%datestr%
 move in\src %snapshotdir%
 """)
 
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
-        lines.append(f'mkdir {in_src} ')
+        lines.append(f'if not exist {in_src} mkdir {in_src} ')
         already_checkouted = set()
 
         for git_url, td_ in self.spec.projects.items():
@@ -419,7 +444,7 @@ if exist "{newpath}\" (
             lines = []
             git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
             projname_ = os.path.split(path_to_dir_)[-1]
-            build_name = 'build_' + projname_
+            build_name = 'build-' + projname_.replace('_', '-')
             path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
             if 'nuitkabuild' in td_:
                 nb_ = td_.nuitkabuild
@@ -473,9 +498,22 @@ if exist "{newpath}\" (
                 src = os.path.join(path_to_dir, srcname)
                 flags_ = nflags_
 
+                svace_prefix = ''
+                if self.svace_mod:                
+                    build_dir = rf'{tmpdir}\{defaultname}.build'
+                    svace_dir = rf'{tmpdir}\{defaultname}.svace-dir'
+                    lines.append(fR"""
+rmdir /S /Q {svace_dir}
+                    """)
+                    svace_prefix = f'{self.svace_path} build --svace-dir {build_dir} '
+                    lines.append(f'''
+{self.svace_path} init {build_dir}
+    ''')
+
+
                 lines.append(fr'''
 rmdir /S /Q %TMP%\gen_py
-.venv\Scripts\python.exe -m nuitka {nflags_}  {src} 2>&1 > {build_name}.log
+{svace_prefix} .venv\Scripts\python.exe -m nuitka {nflags_}  {src} 2>&1 > {build_name}.log
 IF %ERRORLEVEL% NEQ 0 EXIT 1
 ''')
                 if defaultname != outputname:
@@ -504,7 +542,8 @@ editbin /largeaddressaware {tmpdir}\{defaultname}.dist\{outputname}.exe
                         to_ = to_.replace('/', '\\')
                         from_ = from_.replace('/', '\\')
                         to_dir = os.path.split(to_)[0]
-                        lines.append(fr'mkdir {tmpdir}\{defaultname}.dist\{to_dir}')
+                        fdir_ = f'{tmpdir}\{defaultname}.dist\{to_dir}'
+                        lines.append(fr'if not exist {fdir_} mkdir {fdir_}')
                         cp_ = 'copy /-y' if from_is_file else 'xcopy /I /E /Y /D'
                         scmd = fr'echo n | {cp_} "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
                         lines.append(scmd)
@@ -516,7 +555,7 @@ editbin /largeaddressaware {tmpdir}\{defaultname}.dist\{outputname}.exe
                     folder_ = os.path.join(folder_, build.folder)
 
                 outdir_ = fr'{tmpdir}\{projname_}-jsbuild'
-                lines.append(fR"mkdir {outdir_}")
+                lines.append(fR"if not exist {outdir_} mkdir {outdir_}")
                 for file_ in os.listdir(folder_):
                     if file_.endswith('.js'):
                         infile = os.path.join(folder_, file_)
@@ -541,7 +580,7 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Too
     """ % vars(self))
                     # if os.path.exists(os.path.join(folder_, 'packages.config')):
                     lines.append(fR"""     
-nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config 
+nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config || VER>NUL
 """)
                     if isinstance(build.platforms, list):
                         for platform_ in build.platforms:
@@ -569,7 +608,9 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
         lines = []
         for b_ in bfiles:
             lines.append("echo ***********Building " + b_ + ' **************\n\r')
-            lines.append("CMD /C " + b_ + '.bat' + '\n\r')
+            lines.append("CMD /C ta-" + b_ + '.bat' + '\n\r')
+            lines.append(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
+            
         
         mn_ = get_method_name()
         # self.lines2sh(mn_, lines, mn_)
@@ -580,7 +621,7 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
 
 
 
-    def stage_01_download_utilities(self):
+    def stage_01_download_binaries(self):
         '''
         Download binary utilities — compilers, etc
         '''
@@ -596,7 +637,7 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
             scmd = f'wget --no-check-certificate -P {dir2download} -c "{url_}" '
             if os.path.splitext(to_) and not force_dir:
                 dir2download, filename = os.path.split(to_)
-                lines.append(f'mkdir {dir2download}'.replace('/','\\'))
+                lines.append(f'if not exist {dir2download} mkdir {dir2download}'.replace('/','\\'))
                 scmd = f'wget --no-check-certificate -O {dir2download}/{filename} -c "{url_}" '
             lines.append(scmd)
 
@@ -611,8 +652,8 @@ msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configurat
         for name_, it_ in self.spec.download_and_install.items():
             if isinstance(it_, dict):
                 msvc_components = ''
-                # if name_ in ['wixtoolset', 'dependencywalker']:
-                #     wtf = 444
+                if name_ in ['far']:
+                    wtf = 444
                 if 'download' in it_:
                     download_ = it_.download
                     if isinstance(download_, dict):
@@ -709,23 +750,28 @@ del /Q Pipfile
         self.lines2bat(mn_, lines, mn_)    
         pass
 
-    def write_sandbox(self):
+    def stage_97_write_sandbox(self):
         '''
-        Генерация Windows-песочницы (облегченной виртуальной машины)
-        для чистой сборки в нулевой системе.
+          run a windows standbox
         '''
+        # Генерация Windows-песочницы (облегченной виртуальной машины)
+        # для чистой сборки в нулевой системе.
         root_dir = self.root_dir
         wsb_config = fr'''
-<Configuration><MappedFolders> 
+<Configuration>
+<MemoryInMB>8192</MemoryInMB>
+<MappedFolders> 
 <MappedFolder><HostFolder>%~dp0</HostFolder> 
 <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\distro</SandboxFolder> 
 <ReadOnly>false</ReadOnly></MappedFolder> 
 </MappedFolders> 
-<LogonCommand> 
-<Command>C:\Users\WDAGUtilityAccount\Desktop\distro\99-install-tools.bat</Command> 
-</LogonCommand> 
 </Configuration> 
 '''
+
+# <LogonCommand> 
+# <Command>C:\Users\WDAGUtilityAccount\Desktop\distro\ta-99-useful-tools.bat</Command> 
+# </LogonCommand> 
+
         lines = []
 
 
@@ -740,20 +786,24 @@ type nul > ta-sandbox.wsb
 
         lines.append(f'start ta-sandbox.wsb')    
 
-        self.lines2bat("00-start-sandbox-for-building", lines)
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines)
 
 
+    def stage_99_useful_tools(self):
+        '''
+          run a windows standbox
+        '''
         if not os.path.exists(self.output_dir):
             os.mkdir(self.output_dir)
 
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far md5sums procmon git windirstat winmerge vscode anydesk 
+choco install -y far md5sums procmon git windirstat winmerge vscode  
 choco install -y --allow-downgrade wget --version 1.20.3.20190531
-rem choco install -y procmon git windirstat md5sums vscode anydesk 
-rem choco install -y --allow-downgrade wget --version 1.20.3.20190531
 """
-        self.lines2bat("99-install-tools", [scmd])
+        mn_ = get_method_name()
+        self.lines2bat(mn_, [scmd])
 
         with open("install-all-wheels.py", "w", encoding='utf-8') as lf:
             lf.write("""
@@ -777,6 +827,12 @@ print(scmd)
 os.system(scmd)
 """)
 
+
+    def stage_51_make_iso(self):
+        '''
+          Make ISO
+        '''
+
         with open("make-iso.py", "w", encoding='utf-8') as lf:
             lf.write("""
 import sys
@@ -794,17 +850,17 @@ os.system(scmd)
 """)
 
 
-        scmd = fR"""
-call 02-install-utilities.bat 
-call 04-download-base-wheels.bat 
-call 05-init-env.bat 
-call 09-build-wheels.bat
-call 15-install-wheels.bat
-call 40-build-projects-{self.out_dir}.bat
-call 50-output-{self.out_dir}.bat
-call 51-make-iso-{self.out_dir}.bat
-"""
-        self.lines2bat("98-install-and-build-for-audit", [scmd])
+#         scmd = fR"""
+# call 02-install-utilities.bat 
+# call 04-download-base-wheels.bat 
+# call 05-init-env.bat 
+# call 09-build-wheels.bat
+# call 15-install-wheels.bat
+# call 40-build-projects-{self.out_dir}.bat
+# call 50-output-{self.out_dir}.bat
+# call 51-make-iso-{self.out_dir}.bat
+# """
+#         self.lines2bat("98-install-and-build-for-audit", [scmd])
 
         lines_ = []
         for git_url, git_branch, path_to_dir_ in self.get_all_sources():
@@ -845,7 +901,8 @@ md5sums {self.out_dir}/%isofilename% >> {self.out_dir}/%changelogfilename%
 del /Q {self.out_dir}\last.iso
 cmd /c "mklink /H {self.out_dir}\last.iso {self.out_dir}\%isofilename%"
 """
-        self.lines2bat(f"51-make-iso-{self.out_dir}", [scmd], 'make-iso')
+        mn_ = get_method_name()
+        self.lines2bat(mn_, [scmd], mn_)
         pass
 
 
@@ -974,7 +1031,7 @@ del {wheel_dir}\*.tar.*
         pass  
 
 
-    def stage_07_build_conanlibs(self):
+    def stage_07_audit_extra_build_conanlibs(self):
         '''
         Compile conan libraries
         '''
@@ -1045,6 +1102,9 @@ rmdir /S /Q  {relwheelpath}
 """)
         for git_url, td_ in self.spec.projects.items():
             if 'pybuild' not in td_:
+                continue
+
+            if 'pybuild' in td_ and not td_.pybuild:
                 continue
 
             git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
@@ -1276,7 +1336,7 @@ del /Q Pipfile
         output_ = self.spec.output
         out_dir = output_.distro_dir.replace('/', '\\')
         lines.append(fR'rmdir /S /Q "{out_dir}" ')
-        lines.append(fR'mkdir "{out_dir}" ')
+        lines.append(fR'if not exist "{out_dir}" mkdir "{out_dir}" ')
 
         buildroot = self.spec.buildroot_dir
         srcdir  = self.spec.src_dir
@@ -1286,7 +1346,7 @@ del /Q Pipfile
                 sources_ = [s.strip() for s in sources_.strip().split("\n")]
             dst_folder = (out_dir + os.path.sep + folder).replace('/', os.path.sep)
             lines.append(fR"""    
-mkdir {dst_folder}
+if not exist "{dst_folder}" mkdir "{dst_folder}"
     """)
             for from_ in sources_:
                 from__ = from_ 
@@ -1392,5 +1452,5 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
             # self.generate_install_wheels()
         # self.generate_build_projects()
         # self.generate_output()
-        self.write_sandbox()
+        # self.write_sandbox()
         pass
