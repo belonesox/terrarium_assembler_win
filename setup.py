@@ -37,6 +37,7 @@ setup(
     description="Generate Portable Windows Applications",
     entry_points={
         'console_scripts': [
+            'tas=terrarium_assembler_win.cli:main',
             'terrarium_assembler_win=terrarium_assembler_win.cli:main',
         ],
     },
