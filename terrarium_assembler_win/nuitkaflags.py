@@ -80,7 +80,7 @@ def flags4module(modname, module_dir, block_modules=None):
     mods = sorted(find_modules(module_dir)) 
     disabled_re = None
     if block_modules:
-        disabled_re_str = '('  + '|'.join([s.replace('.', '\.') for s in block_modules]) + ')'
+        disabled_re_str = '('  + '|'.join([s.replace('.', r'\.') for s in block_modules]) + ')'
         # print(disabled_re_str)
         disabled_re = re.compile(disabled_re_str)
 

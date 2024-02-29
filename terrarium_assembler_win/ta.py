@@ -236,7 +236,7 @@ class TerrariumAssembler:
 rem Stage "{desc}"
 rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specfile}"
 ''')
-            lf.write(f'''
+            lf.write(fr'''
 set PIPENV_VENV_IN_PROJECT=1
 set TA_PROJECT_DIR=%~dp0
 for /f %%i in ('{self.spec.python_dir}\python -E -m pipenv --venv') do set TA_PIPENV_DIR=%%i
@@ -296,7 +296,7 @@ exit /b %errorlevel%
         # lines2.append(lfs_install)
 
         # lines.add("rm -rf %s " % in_src)
-        lines.append(f"""
+        lines.append(fr"""
 for /f "skip=1" %%x in ('wmic os get localdatetime') do if not defined CurDate set CurDate=%%x
 echo %CurDate%
 set yyyy=%CurDate:~0,4%
@@ -351,7 +351,7 @@ popd
 
 
                 # Fucking https://www.virtualbox.org/ticket/19086 + https://www.virtualbox.org/ticket/8761
-                lines.append(f"""
+                lines.append(fr"""
 if exist "{newpath}\" (
   rmdir /S /Q  "{path_to_dir}"
   move "{newpath}" "{path_to_dir}"
@@ -514,7 +514,7 @@ editbin /largeaddressaware {tmpdir}\{defaultname}.dist\{outputname}.exe
                         to_ = to_.replace('/', '\\')
                         from_ = from_.replace('/', '\\')
                         to_dir = os.path.split(to_)[0]
-                        fdir_ = f'{tmpdir}\{defaultname}.dist\{to_dir}'
+                        fdir_ = fr'{tmpdir}\{defaultname}.dist\{to_dir}'
                         lines.append(fr'if not exist {fdir_} mkdir {fdir_}')
                         cp_ = 'copy /-y' if from_is_file else 'xcopy /I /E /Y /D'
                         scmd = fr'echo n | {cp_} "{from_}" "{tmpdir}\{defaultname}.dist\{to_}"'
@@ -805,7 +805,7 @@ os.system(scmd)
         '''
 
         with open("make-iso.py", "w", encoding='utf-8') as lf:
-            lf.write("""
+            lf.write(r"""
 import sys
 import os
 
@@ -907,8 +907,8 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
 
         if 'remove_python_packages_from_download' in self.spec:
             for package_ in self.spec.remove_python_packages_from_download:
-                scmd = f'''del /Q {wheel_dir}\{package_}-*  '''
-                lines.append(scmd)
+                scmd = fr'''del /Q {wheel_dir}\{package_}-*  '''        
+                lines.append(scmd)                
 
         scmd = fr"""
 for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe  -E  -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
@@ -988,8 +988,8 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
 
         if 'remove_python_packages_from_download' in self.spec:
             for package_ in self.spec.remove_python_packages_from_download:
-                scmd = f'''del /Q {wheel_dir}\{package_}-*  '''
-                lines.append(scmd)
+                scmd = fr'''del /Q {wheel_dir}\{package_}-*  '''        
+                lines.append(scmd)                
 
         scmd = fr"""
 for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe  -E  -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
@@ -1371,7 +1371,7 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
 
     def clear_shell_files(self):
         os.chdir(self.curdir)
-        re_ = re.compile('(\d\d-|ta-).*\.(bat)')
+        re_ = re.compile(r'(\d\d-|ta-).*\.(bat)')
         for sh_ in Path(self.curdir).glob('*.*'):
             if re_.match(sh_.name):
                 sh_.unlink()
