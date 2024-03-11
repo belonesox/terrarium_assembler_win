@@ -774,7 +774,7 @@ type nul > ta-sandbox.wsb
 
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far md5sums procmon git windirstat winmerge vscode
+choco install -y far md5sums procmon windirstat winmerge vscode
 choco install -y --allow-downgrade wget --version 1.20.3.20190531
 """
         mn_ = get_method_name()
