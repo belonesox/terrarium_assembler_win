@@ -256,6 +256,9 @@ set PYTHONHOME=%TA_python_dir%
                         lf.write(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
 
             lf.write(f'''
+echo "OK with {name}"                     
+echo %TIME% %DATE% 
+                     
 goto :EOF
 
 :error
@@ -712,9 +715,10 @@ set PATH={to_};%PATH%'''.split('\n')
         python_dir = self.spec.python_dir.replace("/", "\\")
 
         lines.append(fr'''
-del /Q Pipfile
+del /Q Pipfile | VER>NUL
 {python_dir}\python -E -m pipenv --rm
 {python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe
+{python_dir}\python -E -m pipenv run python install-all-wheels.py {self.spec.basewheel_dir} '
         ''')
 
         mn_ = get_method_name()
@@ -869,7 +873,7 @@ echo "%pyyyy%-%pmm%-%pdd%"
 {python_dir}\python.exe -E -m pipenv run python make-iso.py
 @echo ;MD5: >> {self.out_dir}/%changelogfilename%
 md5sums {self.out_dir}/%isofilename% >> {self.out_dir}/%changelogfilename%
-del /Q {self.out_dir}\last.iso
+del /Q {self.out_dir}\last.iso | VER>NUL
 cmd /c "mklink /H {self.out_dir}\last.iso {self.out_dir}\%isofilename%"
 """
         mn_ = get_method_name()
@@ -889,7 +893,7 @@ cmd /c "mklink /H {self.out_dir}\last.iso {self.out_dir}\%isofilename%"
         wheel_dir = self.spec.basewheel_dir.replace("/", "\\")
         lines.append(fr'''
 if not exist "{wheel_dir}" mkdir "{wheel_dir}"
-del /q {wheel_dir}\*
+del /q {wheel_dir}\* | VER>NUL
 set CONAN_USER_HOME=%~dp0in\libscon
 set CONANROOT=%CONAN_USER_HOME%\.conan\data
 ''')
@@ -907,12 +911,12 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
 
         if 'remove_python_packages_from_download' in self.spec:
             for package_ in self.spec.remove_python_packages_from_download:
-                scmd = fr'''del /Q {wheel_dir}\{package_}-*  '''        
+                scmd = fr'''del /Q {wheel_dir}\{package_}-*  | VER>NUL '''        
                 lines.append(scmd)                
 
         scmd = fr"""
 for %%D in ({wheel_dir}\*.tar.*) do {self.spec.python_dir}\python.exe  -E  -m pipenv run pip wheel --no-deps %%D -w {wheel_dir}
-del {wheel_dir}\*.tar.*
+del /Q {wheel_dir}\*.tar.* | VER>NUL
 """
         lines.append(scmd)
 
@@ -934,7 +938,7 @@ del {wheel_dir}\*.tar.*
         wheel_dir = self.spec.depswheel_dir.replace("/", "\\")
         ourwheel_dir = self.spec.ourwheel_dir.replace("/", "\\")
         lines.append(fr'''
-del /q {wheel_dir}\*
+del /q {wheel_dir}\* | VER>NUL
 set CONAN_USER_HOME=%~dp0in\libscon
 set CONANROOT=%CONAN_USER_HOME%\.conan\data
 ''')
@@ -988,7 +992,7 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
 
         if 'remove_python_packages_from_download' in self.spec:
             for package_ in self.spec.remove_python_packages_from_download:
-                scmd = fr'''del /Q {wheel_dir}\{package_}-*  '''        
+                scmd = fr'''del /Q {wheel_dir}\{package_}-*  | VER>NUL '''        
                 lines.append(scmd)                
 
         scmd = fr"""
@@ -1119,7 +1123,7 @@ rmdir /S /Q  {relwheelpath}
         #     lines.append(fix_win_command(scmd))
 
         lines.append(fr'''
-del /Q Pipfile
+del /Q Pipfile | VER>NUL
 {self.spec.python_dir}\python -E -m pipenv --rm
 {self.spec.python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe
         ''')
