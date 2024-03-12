@@ -716,7 +716,7 @@ set PATH={to_};%PATH%'''.split('\n')
 
         lines.append(fr'''
 del /Q Pipfile | VER>NUL
-{python_dir}\python -E -m pipenv --rm
+{python_dir}\python -E -m pipenv --rm || VER>NUL
 {python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe
 {python_dir}\python -E -m pipenv run python install-all-wheels.py {self.spec.basewheel_dir} '
         ''')
