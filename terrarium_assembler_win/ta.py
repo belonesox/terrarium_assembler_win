@@ -253,7 +253,8 @@ set PYTHONHOME=%TA_python_dir%
                 for line_ in lines_.split('\n'):
                     if line_:
                         lf.write(f'''{line_}\n''')
-                        lf.write(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
+                        if line_.strip():
+                            lf.write(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
 
             lf.write(f'''
 echo "OK with {name}"                     
@@ -478,12 +479,13 @@ if exist "{newpath}\" (
                     build_dir = rf'{tmpdir}\{defaultname}.build'
                     svace_dir = rf'{tmpdir}\{defaultname}.svace-dir'
                     lines.append(fR"""
-rmdir /S /Q {svace_dir}
+rmdir /S /Q {build_dir}
                     """)
                     svace_prefix = f'{self.svace_path} build --svace-dir {build_dir} '
                     lines.append(f'''
 {self.svace_path} init {build_dir}
     ''')
+                    nflags_ = ' --disable-ccache ' + nflags_
 
 
                 lines.append(fr'''
