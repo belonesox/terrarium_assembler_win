@@ -555,26 +555,49 @@ C:\Windows\Microsoft.NET\Framework\v4.0.30319\jsc /out:{outfile}  {infile}
                     lines.append(R"""
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
     """ % vars(self))
+
+                    svace_prefix = ''
+                    msbuild_flags = ''
+                    if self.svace_mod:
+                        # msbuild_flags = ' /t:Rebuild '
+                        svace_dir = rf'{tmpdir}\{projectname_}\.svace-dir'
+                        lines.append(fR"""
+rmdir /S /Q {svace_dir}
+mkdir {svace_dir}
+{self.svace_path} init {svace_dir}
+                        """)
+                        svace_prefix = f'{self.svace_path} build --svace-dir {svace_dir} '
+
                     # if os.path.exists(os.path.join(folder_, 'packages.config')):
                     lines.append(fR"""
-nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config || VER>NUL
+if  exist {folder_}\packages.config nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config || VER>NUL
 """)
                     if isinstance(build.platforms, list):
                         for platform_ in build.platforms:
                             odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
                             rodir_ = os.path.relpath(odir_, start=folder_)
 
+                        if self.svace_mod:
                             lines.append(fR"""
-msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  {msbuild_flags} /t:Clean /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+rmdir /S /Q "%TA_PROJECT_DIR%{odir_}"
+        """)
+                            lines.append(fR"""
+{svace_prefix} msbuild  {msbuild_flags} /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
         """)
                     else:
                         platform_ = build.platforms
                         odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
                         rodir_ = os.path.relpath(odir_, start=folder_)
+                        if self.svace_mod:
+                            lines.append(fR"""
+msbuild  {msbuild_flags} /t:Clean /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+rmdir /S /Q "%TA_PROJECT_DIR%{odir_}"
+        """)
                         lines.append(fR"""
-msbuild  /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-msbuild  /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+{svace_prefix} msbuild  {msbuild_flags} /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
+msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
     """)
 
             if lines:
@@ -726,6 +749,21 @@ del /Q Pipfile | VER>NUL
         mn_ = get_method_name()
         self.lines2bat(mn_, lines, mn_)
         pass
+
+    def stage_91_pack_svace_dirs(self):
+        '''
+          Pack .svace-dir from all build directories
+        '''
+        # Генерация Windows-песочницы (облегченной виртуальной машины)
+        # для чистой сборки в нулевой системе.
+        root_dir = self.root_dir
+        ...
+        # svace_dirs = []
+        svace_dirs = [f.as_posix() for f in Path(self.spec.builds_dir).rglob('**/.svace-dir')]
+        scmd = '7z a -t7z -m0=BCJ2 -m1=LZMA2:d=1024m -aoa ta-svace-dirs.zip ' + ' '.join(svace_dirs)           
+        mn_ = get_method_name()
+        self.lines2bat(mn_, [scmd], mn_)
+        ...        
 
     def stage_97_write_sandbox(self):
         '''
