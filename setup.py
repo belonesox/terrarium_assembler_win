@@ -17,6 +17,7 @@ requirements = [
     'jinja2', 
     'packaging',
     'wheel_filename',
+    'requirements-parser'
 ]
 
 test_requirements = ['pytest>=3', ]

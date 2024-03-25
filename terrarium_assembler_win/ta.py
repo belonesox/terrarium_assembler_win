@@ -18,11 +18,16 @@ import hashlib
 import time
 import json
 import csv
+import requirements
 
 from .wheel_utils import parse_wheel_filename
 from .utils import *
 from .nuitkaflags import *
 from pathlib import Path, PurePath
+
+DEBUG = False
+if 'debugpy' in sys.modules:
+    DEBUG = True
 
 
 def write_doc_table(filename, headers, rows):
@@ -77,6 +82,7 @@ class TerrariumAssembler:
         from pipenv.project import Project
         p = Project()
         self.pipenv_dir = p.virtualenv_location
+        self.need_pips = ['pip-audit', 'pipdeptree', 'ordered-set', 'cyclonedx-bom']
 
         vars_ = {
         #     'pipenv_dir': self.pipenv_dir,
@@ -187,6 +193,11 @@ class TerrariumAssembler:
         if Path(self.svace_path).exists():
             self.svace_mod = True
 
+        Path('reports').mkdir(exist_ok=True, parents=True)
+        self.not_linked_python_packages_path = 'tmp/not-linked-python-packages-path.yml'
+        self.pip_list_json = 'tmp/pip-list.json'
+        self.snapshots_src_path = 'tmp\\snapshots-src'
+
         pass
 
     def cmd(self, scmd):
@@ -253,7 +264,7 @@ set PYTHONHOME=%TA_python_dir%
                 for line_ in lines_.split('\n'):
                     if line_:
                         lf.write(f'''{line_}\n''')
-                        if line_.strip():
+                        if line_.strip() and not line_.startswith('for ') and not line_.startswith('set '):
                             lf.write(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
 
             lf.write(f'''
@@ -311,9 +322,9 @@ set mi=%CurDate:~10,2%
 set ss=%CurDate:~12,2%
 set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 
-if not exist tmp\snapshots-src mkdir tmp\snapshots-src
-set snapshotdir=tmp\snapshots-src\snapshot-src-before-%datestr%
-move in\src %snapshotdir%
+if not exist {self.snapshots_src_path} mkdir {self.snapshots_src_path}
+set snapshotdir={self.snapshots_src_path}\snapshot-src-before-%datestr%
+if exist {self.spec.src_dir} move {self.spec.src_dir} %snapshotdir%
 """)
 
         in_src = os.path.relpath(self.spec.src_dir, start=self.curdir)
@@ -560,10 +571,10 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Too
                     msbuild_flags = ''
                     if self.svace_mod:
                         # msbuild_flags = ' /t:Rebuild '
-                        svace_dir = rf'{tmpdir}\{projectname_}\.svace-dir'
+                        svace_dir = rf'{tmpdir}\{projectname_}'
                         lines.append(fR"""
-rmdir /S /Q {svace_dir}
-mkdir {svace_dir}
+rmdir /S /Q {svace_dir}\.svace-dir
+mkdir {svace_dir}\.svace-dir
 {self.svace_path} init {svace_dir}
                         """)
                         svace_prefix = f'{self.svace_path} build --svace-dir {svace_dir} '
@@ -577,15 +588,15 @@ if  exist {folder_}\packages.config nuget restore -PackagesDirectory {folder_}\.
                             odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
                             rodir_ = os.path.relpath(odir_, start=folder_)
 
-                        if self.svace_mod:
-                            lines.append(fR"""
+                            if self.svace_mod:
+                                lines.append(fR"""
 msbuild  {msbuild_flags} /t:Clean /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
 rmdir /S /Q "%TA_PROJECT_DIR%{odir_}"
-        """)
-                            lines.append(fR"""
+            """)
+                                lines.append(fR"""
 {svace_prefix} msbuild  {msbuild_flags} /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
 msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
-        """)
+            """)
                     else:
                         platform_ = build.platforms
                         odir_ = fr"{tmpdir}\{projectname_}-vsbuild\{platform_}"
@@ -683,6 +694,11 @@ msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{
         packages = []
         lines = []
 
+        Path('ta-if-symlink.ps1').write_text(r'''Get-Item $Env:TA_PROJECT_DIR | Select-Object | foreach {if($_.Target){$_.Target.replace('UNC\', '\\')+'\'}}''')
+        lines.append(r'''
+cd %TA_PROJECT_DIR%                     
+for /f %%i in ('powershell -executionpolicy bypass -File %TA_PROJECT_DIR%\ta-if-symlink.ps1') do set "TA_SYMLINK_PREFIX=%%i"''')
+
         in_bin = os.path.relpath(self.spec.bin_dir, start=self.curdir)
 
         for name_, it_ in self.spec.download_and_install.items():
@@ -711,7 +727,7 @@ msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{
                 if 'target' in it_:
                     to_ = it_.target
                     scmds = f'''
-msiexec.exe /I {artefact} /QB-! INSTALLDIR="{to_}" TargetDir="{to_}"
+msiexec.exe /I %TA_SYMLINK_PREFIX%{artefact} /QB-! INSTALLDIR="{to_}" TargetDir="{to_}"
 set PATH={to_};%PATH%'''.split('\n')
                     lines += scmds
 
@@ -814,17 +830,18 @@ type nul > ta-sandbox.wsb
 
         scmd = R"""
 @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far md5sums procmon windirstat winmerge vscode
+choco install -y far md5sums procmon windirstat winmerge vscode cloc
 choco install -y --allow-downgrade wget --version 1.20.3.20190531
 """
         mn_ = get_method_name()
         self.lines2bat(mn_, [scmd])
 
         with open("install-all-wheels.py", "w", encoding='utf-8') as lf:
-            lf.write("""
+            lf.write(r"""
 import sys
 import os
 import glob
+from pathlib import Path
 
 wheels_to_install = []
 
@@ -832,10 +849,12 @@ for path_ in sys.argv[1:]:
     for whl in glob.glob(f'{path_}/*.whl'):
         wheels_to_install.append(whl)
 
-wheels = " ".join(wheels_to_install)
+reqs_path = r'tmp/reqs.txt'
+Path(reqs_path).write_text("\n".join(wheels_to_install))
+
 
 scmd = fr'''
-{sys.executable} -m pip install --no-deps --force-reinstall --ignore-installed {wheels}
+{sys.executable} -m pip install --no-deps --force-reinstall --ignore-installed -r {reqs_path}
 '''
 
 print(scmd)
@@ -934,7 +953,7 @@ cmd /c "mklink /H {self.out_dir}\last.iso {self.out_dir}\%isofilename%"
         lines.append(fr'''
 if not exist "{wheel_dir}" mkdir "{wheel_dir}"
 del /q {wheel_dir}\* | VER>NUL
-set CONAN_USER_HOME=%~dp0in\libscon
+set CONAN_USER_HOME=%~dp0{self.spec.libscon_dir}
 set CONANROOT=%CONAN_USER_HOME%\.conan\data
 ''')
 
@@ -979,7 +998,7 @@ del /Q {wheel_dir}\*.tar.* | VER>NUL
         ourwheel_dir = self.spec.ourwheel_dir.replace("/", "\\")
         lines.append(fr'''
 del /q {wheel_dir}\* | VER>NUL
-set CONAN_USER_HOME=%~dp0in\libscon
+set CONAN_USER_HOME=%~dp0{self.spec.libscon_dir}
 set CONANROOT=%CONAN_USER_HOME%\.conan\data
 ''')
 
@@ -1027,7 +1046,9 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
         os.chdir(self.curdir)
         setup_paths = " ".join(paths_)
 
-        scmd = fr"{self.spec.python_dir}\python -E -m pipenv run pip download {setup_paths} --dest {wheel_dir} --find-links {ourwheel_dir} "
+        need_pips_str = " ".join(self.need_pips)
+
+        scmd = fr"{self.spec.python_dir}\python -E -m pipenv run pip download {need_pips_str} {setup_paths} --dest {wheel_dir} --find-links {ourwheel_dir} "
         lines.append(fix_win_command(scmd))
 
         if 'remove_python_packages_from_download' in self.spec:
@@ -1060,7 +1081,7 @@ del {wheel_dir}\*.tar.*
         relwheelpath = os.path.relpath(wheelpath, start=self.curdir)
         lines.append(fr"""
 set PIPENV_PIPFILE=%~dp0Pipfile
-set CONAN_USER_HOME=%~dp0in\libscon
+set CONAN_USER_HOME=%~dp0{self.spec.libscon_dir}
 set CONANROOT=%CONAN_USER_HOME%\.conan\data
 set PYTHONHOME={python_dir}
 set PATH=%PYTHONHOME%;%PYTHONHOME%\scripts;C:\Program Files\CMake\bin;%PATH%;
@@ -1110,7 +1131,7 @@ conan remove  --locks
         relwheelpath = os.path.relpath(wheelpath, start=self.curdir)
         lines.append(fr"""
 set PIPENV_PIPFILE=%~dp0Pipfile
-set CONAN_USER_HOME=%~dp0in\libscon
+set CONAN_USER_HOME=%~dp0{self.spec.libscon_dir}
 set CONANROOT=%CONAN_USER_HOME%\.conan\data
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat"
 rmdir /S /Q  {relwheelpath}
@@ -1171,7 +1192,7 @@ del /Q Pipfile | VER>NUL
         scmd = fr'{self.spec.python_dir}/python -m pipenv run python install-all-wheels.py {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
         lines.append(fix_win_command(scmd))
 
-        scmd = fr'{self.spec.python_dir}/python -m pipenv run pip list --format json > python-packages.json'
+        scmd = fr'{self.spec.python_dir}/python -m pipenv run pip list --format json > {self.pip_list_json}'
         lines.append(fix_win_command(scmd))
 
         if 'pipenv_shell_commands' in self.spec:
@@ -1376,42 +1397,234 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
         self.lines2bat(mn_, lines, mn_)
         pass
 
-    def gen_docs(self):
+    def stage_90_audit_analyse(self):
         '''
-        Генерация некоторой автодокументации
+        Generate some documentantion about distro
         '''
-        root_dir = self.root_dir
-        pp_json = 'python-packages.json'
-        pp_htm = 'doc-python-packages.htm'
-        if os.path.exists(pp_json) and not os.path.exists(pp_htm):
-            try:
-                json_ = json.loads(open(pp_json, 'r', encoding='utf-8').read())
-                rows_ = []
-                for r_ in json_:
-                    rows_.append([r_['name'], r_['version']])
+        if not self.build_mode:
+            mn_ = get_method_name()
+            lines = [
+                f'''
+{sys.executable} {sys.argv[0]} "{self.args.specfile}" --stage-audit-analyse
+                ''']
+            self.lines2bat(mn_, lines, mn_)
+            return
 
-                write_doc_table(pp_htm, ['Package', 'Version'], sorted(rows_))
+        if not self.args.stage_audit_analyse:
+            return
+        
+        # wiki_defines_lines = [f'''{{{{#vardefine:fc_version|{self.spec.fc_version}}}}}''']
+        wiki_defines_lines = []
+        for k, v in  [(path_var, getattr(self.spec, path_var)) for path_var in vars(self.spec) if '_path' in path_var or '_dir' in path_var]:
+            wiki_defines_lines.append(f'''{{{{#vardefine:{k}|{v}}}}}''')
+
+        Path('reports/wiki-defines.wiki').write_text('\n'.join([''] + sorted(list(wiki_defines_lines))))
+
+        def analyze_venv():
+            cyclone_json = 'tmp/cyclonedx-bom.json'
+            if Path(cyclone_json).exists():
+                Path(cyclone_json).unlink()
+            for scmd in f'''
+./.venv/Scripts/pip-audit -o tmp/pip-audit-report.json -f json | VER>NUL
+./.venv/Scripts/pipdeptree --json > tmp/pipdeptree.json
+./.venv/Scripts/python -m pip list --format freeze > tmp/piplist-freeze.txt
+./.venv/Scripts/cyclonedx-py --format json -r -i tmp/piplist-freeze.txt  -o tmp/cyclonedx-bom.json
+'''.strip().split('\n'):
+                self.cmd(fix_win_command(scmd))
+    # rm -f tmp/cyclonedx-bom.json
+
+        def generate_docs_graps():
+            lines = [f'''
+            digraph G {{
+                rankdir=LR;
+                ranksep=1;
+                node[shape=box3d, fontsize=8, fontname=Calibry, style=filled fillcolor=aliceblue];
+                edge[color=blue, fontsize=6, fontname=Calibry, style=dashed, dir=back];
+            ''']
+            json_ = json.loads(open('tmp/pipdeptree.json').read())
+            # temporary hack.
+            # todo: later we need to rewrite the code, deleting autoorphaned deps from auxiliary packages such as Nuitka
+            ignore_packages = set('''pipdeptree
+pip pip-api
+Jinja2 MarkupSafe
+Nuitka zstandard
+'''.split() + self.need_pips
+)
+
+# Nuitka cyclonedx-python-lib py-serializeable
+#     defusedxml sortedcontainers packageurl-python py-serializable toml SCons license-expression boolean.py filelock  pip pip-api
+#     rich Pygments markdown-it-py mdurl Jinja2 MarkupSafe
+
+            our_packages = set()
+            for whl in Path(self.spec.ourwheel_dir).rglob('*.whl'):
+                package_name = whl.stem.lower().split('-')[0].replace('_', '-')
+                our_packages.add(package_name)
+
+            linked_packages = set()
+            for v1_ in json_:
+                package_ = v1_['package']
+                deps_ = v1_['dependencies']
+                key1_  = package_['key']
+                name1_ = package_['package_name']
+                if name1_ not in ignore_packages:
+                    for v2_ in deps_:
+                        linked_packages.add(key1_)
+                        key2_  = v2_['key']
+                        name2_ = v2_['package_name']
+                        if name2_ not in ignore_packages:
+                            linked_packages.add(key2_)
+
+            known_packages = set()
+            not_linked_packages = set()
+            for r_ in json_:
+                package_ = r_['package']
+                key_  = package_['key']
+                if key_ not in linked_packages:
+                    not_linked_packages.add(key_)
+                    continue
+                name_ = package_['package_name']
+                if name_ not in ignore_packages:
+                    known_packages.add(name_.lower())
+                    fillcolormod = ''
+                    if name_ in our_packages:
+                        fillcolormod = 'fillcolor=cornsilk '
+                    lines.append(f''' "{key_}" [label="{name_}" {fillcolormod}]; ''')
+
+            with open(self.not_linked_python_packages_path, 'w') as lf:
+                lf.write(yaml.dump(not_linked_packages))
+
+            for v1_ in json_:
+                package_ = v1_['package']
+                deps_ = v1_['dependencies']
+                key1_  = package_['key']
+                if key1_ not in linked_packages:
+                    continue
+                name1_ = package_['package_name']
+                if key1_ == 'pip-audit':
+                    wtf = 1
+                if name1_ not in ignore_packages:
+                    for v2_ in deps_:
+                        key2_  = v2_['key']
+                        name2_ = v2_['package_name']
+                        if name2_ not in ignore_packages:
+                            lines.append(f''' "{key1_}" -> "{key2_}" ;''')
+
+            for git_url, td_ in self.spec.projects.items():
+                git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
+                projname_ = os.path.split(path_to_dir_)[-1]
+                path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
+                if 'nuitkabuild' in td_:
+                    nb_ = td_.nuitkabuild
+                    srcname = nb_.input_py
+                    defaultname = os.path.splitext(srcname)[0]
+                    outputname = defaultname
+                    if "output" in nb_:
+                        outputname = nb_.output
+                    src = os.path.join(path_to_dir, srcname)
+
+                    folder_ = path_to_dir
+                    utility_ = outputname
+                    lines.append(f''' "{utility_}-tool" [label="{utility_}" shape=note fillcolor=darkseagreen2] ;''')
+                    # folderfullpath_ = Path(self.src_dir) / folder_
+
+                    if not Path(src).exists():
+                        continue
+
+                    code_ = open(src, 'r', encoding='utf-8').read()
+
+                    imported_modules = set()
+                    for module_ in generate_imports_from_python_file(code_, path_to_dir):
+                        name_ = module_.replace('_', '-')
+                        if name_ == 'trans':
+                            wtf = 1
+                        if name_ in known_packages:
+                            imported_modules.add(name_)
+
+                    for module_ in sorted(list(imported_modules)):
+                        lines.append(f''' "{utility_}-tool" -> "{module_}" [style=dotted] ;''')
+
+                    reqs = Path(path_to_dir) / 'requirements.txt'
+                    if reqs.exists():
+                        with open(reqs, 'r', encoding='utf-8') as fd:
+                            try:
+                                parsed_ = requirements.parse(fd)
+                                for req in parsed_:
+                                    lines.append(f''' "{utility_}-tool" -> "{req.name}" [style=dotted] ;''')
+                            except Exception as ex_:
+                                print(f'Failed to parse {reqs}')
+                                print(ex_)
+
+            lines.append('}')
+
+            with open('reports/pipdeptree.dot', 'w') as lf:
+                lf.write('\n'.join(lines))
+
+            self.cmd(f'''
+dot -Tsvg reports/pipdeptree.dot > reports/pipdeptree.svg 
+''')
+            ...
+                
+        if DEBUG:
+            analyze_venv()
+            generate_docs_graps()
+        else:    
+            try:
+                analyze_venv()
+                generate_docs_graps()
             except Exception as ex_:
                 print(ex_)
-                pass
 
+        try:
+        # if 1:
+            json_ = json.loads(open('tmp/pip-audit-report.json').read())
+            rows_ = []
+            for r_ in json_['dependencies']:
+                if 'vulns' in r_:
+                    for v_ in r_['vulns']:
+                        rows_.append([r_['name'], r_['version'], v_['id'], ','.join(v_['fix_versions']), v_['description']])
 
-        cloc_csv = 'cloc.csv'
-        if not os.path.exists(cloc_csv):
-            if shutil.which('cloc') and 0:
-                os.system(f'cloc ./in/src/ --csv  --report-file="{cloc_csv}" --3')
+            write_doc_table('reports/pip-audit-report.htm', ['Пакет', 'Версия', 'Возможная уязвимость', 'Исправлено в версиях', 'Описание'], sorted(rows_))
+        except Exception as ex_:
+            print(ex_)
+            pass
 
-        if os.path.exists(cloc_csv):
-            table_csv = []
-            with open(cloc_csv, newline='') as csvfile:
-                csv_r = csv.reader(csvfile, delimiter=',', quotechar='|')
-                for row in list(csv_r)[1:]:
-                    row[-1] = int(float(row[-1]))
-                    table_csv.append(row)
+        try:
+            json_ = json.loads(open(self.pip_list_json).read())
+            rows_ = []
+            for r_ in json_:
+                rows_.append([r_['name'], r_['version']])
 
-            table_csv[-1][-2], table_csv[-1][-1] = table_csv[-1][-1], table_csv[-1][-2]
-            write_doc_table('doc-cloc.htm', ['Файлов', 'Язык', 'Пустых', 'Комментариев', 'Строчек кода', 'Мощность языка', 'COCOMO строк'],
-                            table_csv)
+            write_doc_table('reports/doc-python-packages.htm', ['Package', 'Version'], sorted(rows_))
+        except Exception as ex_:
+            print(ex_)
+            pass
+
+        spec = self.spec
+        #!!! need to fix !!!
+        abs_path_to_out_dir = os.path.abspath(self.out_dir)
+
+        def cloc_for_files(clocname, filetemplate):
+            cloc_csv = f'tmp/{clocname}.csv'
+            if not os.path.exists(cloc_csv):
+                if shutil.which('cloc'):
+                    os.system(f'cloc {filetemplate} --csv  --timeout 3600  --report-file={cloc_csv} --3')
+            if os.path.exists(cloc_csv):
+                table_csv = []
+                with open(cloc_csv, newline='') as csvfile:
+                    csv_r = csv.reader(csvfile, delimiter=',', quotechar='|')
+                    for row in list(csv_r)[1:]:
+                        if 'Dockerfile' != row[1]:
+                            row[-1] = int(float(row[-1]))
+                            table_csv.append(row)
+
+                table_csv[-1][-2], table_csv[-1][-1] = table_csv[-1][-1], table_csv[-1][-2]
+                write_doc_table(f'tmp/{clocname}.htm', ['Файлов', 'Язык', 'Пустых', 'Комментариев', 'Строчек кода', 'Мощность языка', 'COCOMO строк'],
+                                table_csv)
+
+        cloc_for_files('our-cloc', f'./in/src/')
+        cloc_for_files('libs-cloc', f'./{self.spec.libscon_dir}')
+        
+        ...        
 
     def clear_shell_files(self):
         os.chdir(self.curdir)
