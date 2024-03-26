@@ -197,7 +197,8 @@ class TerrariumAssembler:
         self.not_linked_python_packages_path = 'tmp/not-linked-python-packages-path.yml'
         self.pip_list_json = 'tmp/pip-list.json'
         self.snapshots_src_path = 'tmp\\snapshots-src'
-
+        self.clean_checkouted_sources_path = 'tmp\\clean-checkouted-sources.zip'
+        self.audit_archive_path = 'win-pack-for-audit.zip'
         pass
 
     def cmd(self, scmd):
@@ -247,10 +248,11 @@ class TerrariumAssembler:
 rem Stage "{desc}"
 rem  Automatically called when {self.ta_name} --stage-{stage_} "{self.args.specfile}"
 ''')
+# for /f %%i in ('{self.spec.python_dir}\python -E -m pipenv --venv') do set TA_PIPENV_DIR=%%i
             lf.write(fr'''
 set PIPENV_VENV_IN_PROJECT=1
 set TA_PROJECT_DIR=%~dp0
-for /f %%i in ('{self.spec.python_dir}\python -E -m pipenv --venv') do set TA_PIPENV_DIR=%%i
+set TA_PIPENV_DIR=%TA_PROJECT_DIR%\.venv
 ''')
 
             for k, v in self.tvars.items():
@@ -339,8 +341,12 @@ if exist {self.spec.src_dir} move {self.spec.src_dir} %snapshotdir%
                 path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
                 newpath = path_to_dir + '.new'
                 lines.append(f'rmdir /S /Q "{newpath}"')
+                
+                # lines.append('rm -rf "%(newpath)s"' % vars())
+                # scmd = 'git --git-dir=/dev/null clone --single-branch --branch %(git_branch)s  --depth=1 %(git_url)s %(newpath)s ' % vars()
+                
                 scmd = f'''
-git --git-dir=/dev/null clone  {git_url} {newpath}
+git --git-dir=/dev/null clone --single-branch --branch {git_branch} --depth=1 {git_url} {newpath}
 pushd {newpath}
 git checkout {git_branch}
 git lfs pull
@@ -372,6 +378,13 @@ if exist "{newpath}\" (
   move "{newpath}" "{path_to_dir}"
 )
 """)
+
+        lines.append(fr"""
+del /Q {self.clean_checkouted_sources_path} | VER>NUL 
+7z a -tzip "{self.clean_checkouted_sources_path}" "{self.spec.src_dir}"
+""")
+# powershell compression sucks
+#powershell -c 'Compress-Archive -Path "in\src" -DestinationPath "{self.clean_checkouted_sources}" -CompressionLevel Optimal'
 
         mn_ = get_method_name()
         self.lines2bat(mn_, lines, mn_)
@@ -581,7 +594,7 @@ mkdir {svace_dir}\.svace-dir
 
                     # if os.path.exists(os.path.join(folder_, 'packages.config')):
                     lines.append(fR"""
-if  exist {folder_}\packages.config nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config || VER>NUL
+if  exist {folder_}\packages.config nuget restore -PackagesDirectory {folder_}\..\packages {folder_}\packages.config | VER>NUL
 """)
                     if isinstance(build.platforms, list):
                         for platform_ in build.platforms:
@@ -754,10 +767,12 @@ set PATH={to_};%PATH%'''.split('\n')
         lines = []
 
         python_dir = self.spec.python_dir.replace("/", "\\")
+# {python_dir}\python -E -m pipenv --rm | VER>NUL
 
         lines.append(fr'''
 del /Q Pipfile | VER>NUL
-{python_dir}\python -E -m pipenv --rm || VER>NUL
+rmdir /Q /S .venv | VER>NUL
+set PIPENV_PIPFILE=
 {python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe
 {python_dir}\python -E -m pipenv run python install-all-wheels.py {self.spec.basewheel_dir} '
         ''')
@@ -780,6 +795,44 @@ del /Q Pipfile | VER>NUL
         mn_ = get_method_name()
         self.lines2bat(mn_, [scmd], mn_)
         ...        
+
+
+    def stage_96_start_clean_box(self):
+        '''
+          write Vagrant file for Hyper-V internal builder
+        '''
+        # Генерация Windows-песочницы (виртуальной машины)
+        # для чистой сборки в нулевой системе.
+        root_dir = self.root_dir
+        Path('Vagrantfile').write_text(fr'''
+Vagrant.configure(2) do |config|
+  config.vm.box_check_update = false
+  config.vm.synced_folder '.', '/vagrant', disabled: true
+ 
+  config.vm.define "ta-builder-hyperv" do |conf|
+    vmname = "ta-builder-hyperv"
+    conf.vm.box = "ta-builder-hyperv"
+    conf.vm.box_url = "./in/bin/vagrant-boxes/hyperv/hypev-win.box"
+    config.vm.provider "hyperv" do |h|
+       h.maxmemory = 8192
+       h.linked_clone = true
+       h.cpus = 4    
+       h.enable_virtualization_extensions = true
+       h.vm_integration_services = {{
+          guest_service_interface: true,
+       }}	
+    end
+    conf.vm.synced_folder '.', 'C:\\distro', disabled: false
+  end
+end
+''')
+        lines = []
+        lines.append(rf'''
+vagrant up                     
+powershell -c "vmconnect.exe $env:computername $(Get-VM -Id $(Get-Content .\.vagrant\machines\ta-builder-hyperv\hyperv\id)).Name"
+''')
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines)
 
     def stage_97_write_sandbox(self):
         '''
@@ -1182,10 +1235,12 @@ rmdir /S /Q  {relwheelpath}
         # for p_ in pl_:
         #     scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --ignore-installed  %s ' % p_
         #     lines.append(fix_win_command(scmd))
+# {self.spec.python_dir}\python -E -m pipenv --rm | VER>NUL
 
         lines.append(fr'''
 del /Q Pipfile | VER>NUL
-{self.spec.python_dir}\python -E -m pipenv --rm
+set PIPENV_PIPFILE=
+rmdir /Q /S .venv | VER>NUL
 {self.spec.python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe
         ''')
 
@@ -1318,50 +1373,62 @@ del /Q Pipfile | VER>NUL
                     os.system(f'''git push origin ''')
                 os.chdir(self.curdir)
 
-    def pack_me(self):
+
+    def stage_92_pack_me(self):
         '''
         Pack sources and deps for audit
         '''
-        time_prefix = datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
-        parentdir, curname = os.path.split(self.curdir)
-        disabled_suffix = curname + '.tar.bz2'
+        lines = []
+        ext_dirs = ''
+        if Path('app').exists():
+            ext_dirs = 'app'
+        lines.append(fr'''
+copy {self.clean_checkouted_sources_path} {self.audit_archive_path}
+7z a -mx=1 -tzip {self.audit_archive_path} {self.spec.bin_dir} {self.spec.libscon_dir} {ext_dirs} Vagrantfile "install-*.*" "ta-*.bat" "ta-*.ps1" tmp\readme.html 
+''')
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines)
 
-        banned_ext = ['.old', '.iso', '.lock', disabled_suffix, '.dblite', '.tmp', '.log']
-        banned_start = ['tmp']
-        banned_mid = ['/out', '/wtf', '/ourwheel/', '/ourwheel-', '/test.', '/test/', '/.vagrant', '/.vscode', '/key/', '/tmp/', '/src.', '/bin.',  '/cache_', 'cachefilelist_', '/.image', '/!']
+        
+    #     time_prefix = datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
+    #     parentdir, curname = os.path.split(self.curdir)
+    #     disabled_suffix = curname + '.tar.bz2'
 
-        def filter_(tarinfo):
-            for s in banned_ext:
-                if tarinfo.name.endswith(s):
-                    print(tarinfo.name)
-                    return None
+    #     banned_ext = ['.old', '.iso', '.lock', disabled_suffix, '.dblite', '.tmp', '.log']
+    #     banned_start = ['tmp', '.venv', '!', '.git']
+    #     banned_mid = ['/out', 'printscreenmark', '/wtf', '/ourwheel/', '/ourwheel-', '/test.', '/test/', '/.vagrant', '/.vscode', '/key/', '/tmp/', '/src.', '/bin.',  '/cache_', 'cachefilelist_', '/.image', '/!']
 
-            for s in banned_start:
-                if tarinfo.name.startswith(s):
-                    print(tarinfo.name)
-                    return None
+    #     def filter_(tarinfo):
+    #         for s in banned_ext:
+    #             if tarinfo.name.endswith(s):
+    #                 print(tarinfo.name)
+    #                 return None
 
-            for s in banned_mid:
-                if s in tarinfo.name:
-                    print(tarinfo.name)
-                    return None
+    #         for s in banned_start:
+    #             if tarinfo.name.startswith(s):
+    #                 print(tarinfo.name)
+    #                 return None
 
-            return tarinfo
+    #         for s in banned_mid:
+    #             if s in tarinfo.name:
+    #                 print(tarinfo.name)
+    #                 return None
 
-
-        tbzname = os.path.join(self.curdir,
-                "%(time_prefix)s-%(curname)s.tar" % vars())
-        # tar = tarfile.open(tbzname, "w:bz2")
-        tar = tarfile.open(tbzname, "w")
-        tar.add(self.curdir, "./sources-for-audit", recursive=True, filter=filter_)
-        tar.close()
+    #         return tarinfo
 
 
-    #     tbzname = os.path.join(self.curdir,
-    #             "%(time_prefix)s-%(curname)s.tar.bz2" % vars())
-    #     tar = tarfile.open(tbzname, "w:bz2")
-    #     tar.add(self.curdir, recursive=True, filter=filter_)
+    #     filename = 'win-sources-for-audit'        
+    #     tarname = os.path.join(self.curdir, f"{filename}.tar")
+    #     tar = tarfile.open(tarname, "w")
+    #     tar.add(self.curdir, f"{filename}", recursive=True, filter=filter_)
     #     tar.close()
+    #     self.cmd(f'''powershell -c 'Compress-Archive -Path "{tarname}" -DestinationPath "{filename}.zip" -CompressionLevel Optimal' ''')
+
+    # #     tbzname = os.path.join(self.curdir,
+    # #             "%(time_prefix)s-%(curname)s.tar.bz2" % vars())
+    # #     tar = tarfile.open(tbzname, "w:bz2")
+    # #     tar.add(self.curdir, recursive=True, filter=filter_)
+    # #     tar.close()
 
 
     def stage_50_output(self):
@@ -1418,7 +1485,7 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
         for k, v in  [(path_var, getattr(self.spec, path_var)) for path_var in vars(self.spec) if '_path' in path_var or '_dir' in path_var]:
             wiki_defines_lines.append(f'''{{{{#vardefine:{k}|{v}}}}}''')
 
-        Path('reports/wiki-defines.wiki').write_text('\n'.join([''] + sorted(list(wiki_defines_lines))))
+        Path('reports/wiki-defines.wiki').write_text(' '.join([''] + sorted(list(wiki_defines_lines))))
 
         def analyze_venv():
             cyclone_json = 'tmp/cyclonedx-bom.json'
