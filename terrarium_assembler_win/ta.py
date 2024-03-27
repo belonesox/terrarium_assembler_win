@@ -920,8 +920,7 @@ os.system(scmd)
           Make ISO
         '''
 
-        with open("make-iso.py", "w", encoding='utf-8') as lf:
-            lf.write(r"""
+        Path("make-iso.py").write_text("""
 import sys
 import os
 
@@ -930,33 +929,19 @@ isofilename = os.environ["isofilename"]
 ta_out_dir = os.environ["TA_out_dir"]
 
 scmd = fr'''
-{sys.executable} {venv_path}\Scripts\pycdlib-genisoimage -U -iso-level 4 -R -o {ta_out_dir}/{isofilename} {ta_out_dir}/iso
+{sys.executable} .venv\Scripts\pycdlib-genisoimage -U -iso-level 4 -R -o {ta_out_dir}/{isofilename} {ta_out_dir}/iso
 '''
 print(scmd)
 os.system(scmd)
 """)
 
-
-#         scmd = fR"""
-# call 02-install-utilities.bat
-# call 04-download-base-wheels.bat
-# call 05-init-env.bat
-# call 09-build-wheels.bat
-# call 15-install-wheels.bat
-# call 40-build-projects-{self.out_dir}.bat
-# call 50-output-{self.out_dir}.bat
-# call 51-make-iso-{self.out_dir}.bat
-# """
-#         self.lines2bat("98-install-and-build-for-audit", [scmd])
-
         lines_ = []
-        for git_url, git_branch, path_to_dir_ in self.get_all_sources():
-            lines_.append(f'''
-@echo ---- Changelog for {path_to_dir_} >> {self.out_dir}/%changelogfilename%
-git -C {path_to_dir_} log --since="%pyyyy%-%pmm%-%pdd%" --pretty --name-status   >> {self.out_dir}/%changelogfilename%
-            ''')
+#         for git_url, git_branch, path_to_dir_ in self.get_all_sources():
+#             lines_.append(f'''
+# @echo ---- Changelog for {path_to_dir_} >> {self.out_dir}/%changelogfilename%
+# git -C {path_to_dir_} log --since="%pyyyy%-%pmm%-%pdd%" --pretty --name-status   >> {self.out_dir}/%changelogfilename%
+#             ''')
         changelog_mode = "\n".join(lines_)
-
 
         python_dir = self.spec.python_dir.replace("/", "\\")
         scmd = fR"""
