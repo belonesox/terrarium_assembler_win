@@ -903,6 +903,7 @@ for path_ in sys.argv[1:]:
         wheels_to_install.append(whl)
 
 reqs_path = r'tmp/reqs.txt'
+Path(reqs_path).parent.mkdir(exist_ok=True, parents=True)
 Path(reqs_path).write_text("\n".join(wheels_to_install))
 
 
