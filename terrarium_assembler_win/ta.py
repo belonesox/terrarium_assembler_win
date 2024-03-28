@@ -1369,7 +1369,7 @@ rmdir /Q /S .venv | VER>NUL
             ext_dirs = 'app'
         lines.append(fr'''
 copy {self.clean_checkouted_sources_path} {self.audit_archive_path}
-7z a -mx=1 -tzip {self.audit_archive_path} {self.spec.bin_dir} {self.spec.libscon_dir} {ext_dirs} Vagrantfile "install-*.*" "ta-*.bat" "ta-*.ps1" tmp\readme.html 
+7z a -mx=1 -tzip {self.audit_archive_path} {self.spec.bin_dir} {self.spec.libscon_dir} {ext_dirs} Vagrantfile "install-*.*" "ta-*.bat" "ta-*.ps1" "audit-*.bat" readme.html 
 ''')
         mn_ = get_method_name()
         self.lines2bat(mn_, lines)
