@@ -343,10 +343,10 @@ if exist {self.spec.src_dir} move {self.spec.src_dir} %snapshotdir%
                 lines.append(f'rmdir /S /Q "{newpath}"')
                 
                 # lines.append('rm -rf "%(newpath)s"' % vars())
-                # scmd = 'git --git-dir=/dev/null clone --single-branch --branch %(git_branch)s  --depth=1 %(git_url)s %(newpath)s ' % vars()
+                # scmd = 'git --git-dir=/dev/null clone --single-branch --branch %(git_branch)s  --depth=40 %(git_url)s %(newpath)s ' % vars()
                 
                 scmd = f'''
-git --git-dir=/dev/null clone --single-branch --branch {git_branch} --depth=1 {git_url} {newpath}
+git --git-dir=/dev/null clone --single-branch --branch {git_branch} --depth=50 {git_url} {newpath}
 pushd {newpath}
 git checkout {git_branch}
 git lfs pull
@@ -606,7 +606,7 @@ if  exist {folder_}\packages.config nuget restore -PackagesDirectory {folder_}\.
 msbuild  {msbuild_flags} /t:Clean /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
 rmdir /S /Q "%TA_PROJECT_DIR%{odir_}"
             """)
-                                lines.append(fR"""
+                            lines.append(fR"""
 {svace_prefix} msbuild  {msbuild_flags} /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
 msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{build.configuration}" /p:Platform="{platform_}" {folder_}\{projectfile_}
             """)
@@ -1370,7 +1370,7 @@ rmdir /Q /S .venv | VER>NUL
             ext_dirs = 'app'
         lines.append(fr'''
 copy {self.clean_checkouted_sources_path} {self.audit_archive_path}
-7z a -mx=1 -tzip {self.audit_archive_path} {self.spec.bin_dir} {self.spec.libscon_dir} {ext_dirs} Vagrantfile "install-*.*" "ta-*.bat" "ta-*.ps1" "audit-*.bat" readme.html 
+7z a -mx=1 -tzip {self.audit_archive_path} {self.spec.bin_dir} {self.spec.libscon_dir} {ext_dirs} Vagrantfile "install-*.*" "ta-*.bat" "ta-*.ps1" "audit-*.bat" make-iso.py readme.html 
 ''')
         mn_ = get_method_name()
         self.lines2bat(mn_, lines)
