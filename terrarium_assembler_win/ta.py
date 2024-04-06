@@ -780,20 +780,20 @@ set PIPENV_PIPFILE=
         self.lines2bat(mn_, lines, mn_)
         pass
 
-    def stage_91_pack_svace_dirs(self):
-        '''
-          Pack .svace-dir from all build directories
-        '''
-        # Генерация Windows-песочницы (облегченной виртуальной машины)
-        # для чистой сборки в нулевой системе.
-        root_dir = self.root_dir
-        ...
-        # svace_dirs = []
-        svace_dirs = [f.as_posix() for f in Path(self.spec.builds_dir).rglob('**/.svace-dir')]
-        scmd = '7z a -t7z -m0=BCJ2 -m1=LZMA2:d=1024m -aoa ta-svace-dirs.zip ' + ' '.join(svace_dirs)           
-        mn_ = get_method_name()
-        self.lines2bat(mn_, [scmd], mn_)
-        ...        
+    # def stage_91_pack_svace_dirs(self):
+    #     '''
+    #       Pack .svace-dir from all build directories
+    #     '''
+    #     # Генерация Windows-песочницы (облегченной виртуальной машины)
+    #     # для чистой сборки в нулевой системе.
+    #     root_dir = self.root_dir
+    #     ...
+    #     # svace_dirs = []
+    #     svace_dirs = [f.as_posix() for f in Path(self.spec.builds_dir).rglob('**/.svace-dir')]
+    #     scmd = '7z a -t7z -m0=BCJ2 -m1=LZMA2:d=1024m -aoa ta-svace-dirs.zip ' + ' '.join(svace_dirs)           
+    #     mn_ = get_method_name()
+    #     self.lines2bat(mn_, [scmd], mn_)
+    #     ...        
 
 
     def stage_96_start_clean_box(self):
@@ -833,43 +833,43 @@ powershell -c "vmconnect.exe $env:computername $(Get-VM -Id $(Get-Content .\.vag
         mn_ = get_method_name()
         self.lines2bat(mn_, lines)
 
-    def stage_97_write_sandbox(self):
-        '''
-          run a windows standbox
-        '''
-        # Генерация Windows-песочницы (облегченной виртуальной машины)
-        # для чистой сборки в нулевой системе.
-        root_dir = self.root_dir
-        wsb_config = fr'''
-<Configuration>
-<MemoryInMB>8192</MemoryInMB>
-<MappedFolders>
-<MappedFolder><HostFolder>%~dp0</HostFolder>
-<SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\distro</SandboxFolder>
-<ReadOnly>false</ReadOnly></MappedFolder>
-</MappedFolders>
-</Configuration>
-'''
+#     def stage_97_write_sandbox(self):
+#         '''
+#           run a windows standbox
+#         '''
+#         # Генерация Windows-песочницы (облегченной виртуальной машины)
+#         # для чистой сборки в нулевой системе.
+#         root_dir = self.root_dir
+#         wsb_config = fr'''
+# <Configuration>
+# <MemoryInMB>8192</MemoryInMB>
+# <MappedFolders>
+# <MappedFolder><HostFolder>%~dp0</HostFolder>
+# <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\distro</SandboxFolder>
+# <ReadOnly>false</ReadOnly></MappedFolder>
+# </MappedFolders>
+# </Configuration>
+# '''
 
-# <LogonCommand>
-# <Command>C:\Users\WDAGUtilityAccount\Desktop\distro\ta-99-useful-tools.bat</Command>
-# </LogonCommand>
+# # <LogonCommand>
+# # <Command>C:\Users\WDAGUtilityAccount\Desktop\distro\ta-99-useful-tools.bat</Command>
+# # </LogonCommand>
 
-        lines = []
+#         lines = []
 
-        lines.append(f'''
-rem
-setlocal enableDelayedExpansion
-type nul > ta-sandbox.wsb
-''')
-        for line in wsb_config.strip().split("\n"):
-            lines.append(f'set "tag_line={line}"')
-            lines.append(f'echo !tag_line! >> ta-sandbox.wsb ')
+#         lines.append(f'''
+# rem
+# setlocal enableDelayedExpansion
+# type nul > ta-sandbox.wsb
+# ''')
+#         for line in wsb_config.strip().split("\n"):
+#             lines.append(f'set "tag_line={line}"')
+#             lines.append(f'echo !tag_line! >> ta-sandbox.wsb ')
 
-        lines.append(f'start ta-sandbox.wsb')
+#         lines.append(f'start ta-sandbox.wsb')
 
-        mn_ = get_method_name()
-        self.lines2bat(mn_, lines)
+#         mn_ = get_method_name()
+#         self.lines2bat(mn_, lines)
 
     def stage_51_make_iso(self):
         '''
@@ -1371,7 +1371,6 @@ rmdir /Q /S .venv | VER>NUL
         if not self.args.stage_audit_analyse:
             return
         
-        # wiki_defines_lines = [f'''{{{{#vardefine:fc_version|{self.spec.fc_version}}}}}''']
         wiki_defines_lines = []
         for k, v in  [(path_var, getattr(self.spec, path_var)) for path_var in vars(self.spec) if '_path' in path_var or '_dir' in path_var]:
             wiki_defines_lines.append(f'''{{{{#vardefine:{k}|{v}}}}}''')
