@@ -93,28 +93,6 @@ class TerrariumAssembler:
         ap.add_argument('--debug', default=False, action='store_true', help='Debug version of release')
         ap.add_argument('--docs', default=False, action='store_true', help='Output documentation version')
 
-        # # Основные этапы сборки
-        # self.stages = {
-        #     # 'download-utilities' : 'download binary files',
-        #     # 'download-msvc' : 'download MSVC versions',
-        #     'checkout' : 'checkout sources',
-        #     'install-utilities': 'install downloaded utilities',
-        #     'init-env': 'install environment',
-        #     'download-base-wheels': 'download base WHL-python packages',
-        #     'download-wheels': 'download needed WHL-python packages',
-        #     'build-conanlibs': 'compile conan libraries',
-        #     'build-wheels': 'compile wheels for our python sources',
-        #     'install-wheels': 'Install our and external Python wheels',
-        #     'build-projects': 'Compile Python packages to executable',
-        #     'pack_me' :  'Pack current dir to time prefixed tar.bz2',
-        #     'output' :   'Generate «out» for ditribution',
-        #     'gen-docs' : 'Generate docs about sources/packages',
-        #     'make-iso': 'Make ISO disk from distribution',
-        # }
-
-        # for stage, desc in self.stages.items():
-        #     ap.add_argument('--stage-%s' % stage, default=False, action='store_true', help='Stage for %s ' % desc)
-
         self.stages_names = sorted([method_name for method_name in dir(self) if method_name.startswith('stage_')])
         self.stage_methods = [getattr(self, stage_) for stage_ in self.stages_names]
 
@@ -126,12 +104,6 @@ class TerrariumAssembler:
             ap.add_argument(f'--{fname2option(stage)}', default=False,
                             action='store_true', help=f'{desc}')
 
-
-        # ap.add_argument('--stage-build-and-pack', default='', type=str, help='Install, build and pack')
-        # ap.add_argument('--stage-download-all', default=False, action='store_true', help='Download all — sources, packages')
-        # ap.add_argument('--stage-my-source-changed', default='', type=str, help='Fast rebuild/repack if only pythonsourcechanged')
-        # ap.add_argument('--stage-all', default='', type=str, help='Install, build and pack')
-        # ap.add_argument('--stage-pack', default='', type=str, help='Stage pack to given destination directory')
         ap.add_argument('--folder-command', default='', type=str, help='Perform some shell command for all projects')
         ap.add_argument('--git-sync', default='', type=str, help='Perform lazy git sync for all projects')
         ap.add_argument('--steps', type=str, default='', help='Steps like page list or intervals')
@@ -379,10 +351,10 @@ if exist "{newpath}\" (
 )
 """)
 
-        lines.append(fr"""
-del /Q {self.clean_checkouted_sources_path} | VER>NUL 
-7z a -tzip "{self.clean_checkouted_sources_path}" "{self.spec.src_dir}"
-""")
+#         lines.append(fr"""
+# del /Q {self.clean_checkouted_sources_path} | VER>NUL 
+# 7z a -tzip "{self.clean_checkouted_sources_path}" "{self.spec.src_dir}"
+# """)
 # powershell compression sucks
 #powershell -c 'Compress-Archive -Path "in\src" -DestinationPath "{self.clean_checkouted_sources}" -CompressionLevel Optimal'
 
@@ -762,6 +734,33 @@ set PATH={to_};%PATH%'''.split('\n')
         Create python environment
         '''
         root_dir = self.root_dir
+        
+        with open("install-all-wheels.py", "w", encoding='utf-8') as lf:
+            lf.write(r"""
+import sys
+import os
+import glob
+from pathlib import Path
+
+wheels_to_install = []
+
+for path_ in sys.argv[1:]:
+    for whl in glob.glob(f'{path_}/*.whl'):
+        wheels_to_install.append(whl)
+
+reqs_path = r'tmp/reqs.txt'
+Path(reqs_path).parent.mkdir(exist_ok=True, parents=True)
+Path(reqs_path).write_text("\n".join(wheels_to_install))
+
+
+scmd = fr'''
+{sys.executable} -m pip install --no-deps --force-reinstall --ignore-installed -r {reqs_path}
+'''
+
+print(scmd)
+os.system(scmd)
+""")
+        
         args = self.args
         packages = []
         lines = []
@@ -858,7 +857,6 @@ powershell -c "vmconnect.exe $env:computername $(Get-VM -Id $(Get-Content .\.vag
 
         lines = []
 
-
         lines.append(f'''
 rem
 setlocal enableDelayedExpansion
@@ -873,79 +871,20 @@ type nul > ta-sandbox.wsb
         mn_ = get_method_name()
         self.lines2bat(mn_, lines)
 
-
-    def stage_99_useful_tools(self):
-        '''
-          run a windows standbox
-        '''
-        if not os.path.exists(self.output_dir):
-            os.mkdir(self.output_dir)
-
-        scmd = R"""
-@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-choco install -y far md5sums procmon windirstat winmerge vscode cloc
-choco install -y --allow-downgrade wget --version 1.20.3.20190531
-"""
-        mn_ = get_method_name()
-        self.lines2bat(mn_, [scmd])
-
-        with open("install-all-wheels.py", "w", encoding='utf-8') as lf:
-            lf.write(r"""
-import sys
-import os
-import glob
-from pathlib import Path
-
-wheels_to_install = []
-
-for path_ in sys.argv[1:]:
-    for whl in glob.glob(f'{path_}/*.whl'):
-        wheels_to_install.append(whl)
-
-reqs_path = r'tmp/reqs.txt'
-Path(reqs_path).parent.mkdir(exist_ok=True, parents=True)
-Path(reqs_path).write_text("\n".join(wheels_to_install))
-
-
-scmd = fr'''
-{sys.executable} -m pip install --no-deps --force-reinstall --ignore-installed -r {reqs_path}
-'''
-
-print(scmd)
-os.system(scmd)
-""")
-
-
     def stage_51_make_iso(self):
         '''
-          Make ISO
+          Make ISOs
         '''
 
-        Path("make-iso.py").write_text("""
-import sys
-import os
+        lines_all = []        
+        for output_key, output_ in self.spec.outputs.items():
+            build_output_name = f'generate-iso-for-{output_key}'
+            
+            lines_ = []
+            changelog_mode = "\n".join(lines_)
 
-venv_path = os.environ["VIRTUAL_ENV"]
-isofilename = os.environ["isofilename"]
-ta_out_dir = os.environ["TA_out_dir"]
-
-scmd = fr'''
-{sys.executable} .venv\Scripts\pycdlib-genisoimage -U -iso-level 4 -R -o {ta_out_dir}/{isofilename} {ta_out_dir}/iso
-'''
-print(scmd)
-os.system(scmd)
-""")
-
-        lines_ = []
-#         for git_url, git_branch, path_to_dir_ in self.get_all_sources():
-#             lines_.append(f'''
-# @echo ---- Changelog for {path_to_dir_} >> {self.out_dir}/%changelogfilename%
-# git -C {path_to_dir_} log --since="%pyyyy%-%pmm%-%pdd%" --pretty --name-status   >> {self.out_dir}/%changelogfilename%
-#             ''')
-        changelog_mode = "\n".join(lines_)
-
-        python_dir = self.spec.python_dir.replace("/", "\\")
-        scmd = fR"""
+            python_dir = self.spec.python_dir.replace("/", "\\")
+            scmd = fR"""
 rem
 for /f "skip=1" %%x in ('wmic os get localdatetime') do if not defined CurDate set CurDate=%%x
 echo %CurDate%
@@ -959,8 +898,8 @@ set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 set isoprefix=%datestr%-dm-win-distr
 set isofilename=%isoprefix%.iso
 set changelogfilename=%isoprefix%.changelog.txt
-echo %isofilename% > {self.out_dir}/iso/isodistr.txt
-for /f "tokens=*" %%i in ('dir /b /o:n "{self.out_dir}\*.iso"') do set lastiso=%%~ni
+echo %isofilename% > {output_key}/iso/isodistr.txt
+for /f "tokens=*" %%i in ('dir /b /o:n "{output_key}\*.iso"') do set lastiso=%%~ni
 set /a "pyyyy=%yyyy%-1"
 if not defined lastiso set lastiso=%pyyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
 set pyyyy=%lastiso:~0,4%
@@ -968,14 +907,17 @@ set pmm=%lastiso:~5,2%
 set pdd=%lastiso:~8,2%
 echo "%pyyyy%-%pmm%-%pdd%"
 {changelog_mode}
-{python_dir}\python.exe -E -m pipenv run python make-iso.py
-@echo ;MD5: >> {self.out_dir}/%changelogfilename%
-md5sums {self.out_dir}/%isofilename% >> {self.out_dir}/%changelogfilename%
-del /Q {self.out_dir}\last.iso | VER>NUL
-cmd /c "mklink /H {self.out_dir}\last.iso {self.out_dir}\%isofilename%"
+.venv\Scripts\python .venv\Scripts\pycdlib-genisoimage -U -iso-level 4 -R -o {output_key}/%isofilename% {output_key}/iso
+@echo ;MD5: >> {output_key}/%changelogfilename%
+md5sums {output_key}/%isofilename% >> {output_key}/%changelogfilename%
+del /Q {output_key}\last.iso | VER>NUL
+cmd /c "mklink /H {output_key}\last.iso {output_key}\%isofilename%"
 """
+            self.lines2bat(build_output_name, [scmd])
+            lines_all.append(f'call ta-{build_output_name}.bat')
+
         mn_ = get_method_name()
-        self.lines2bat(mn_, [scmd], mn_)
+        self.lines2bat(mn_, lines_all, mn_)
         pass
 
 
@@ -1359,95 +1301,58 @@ rmdir /Q /S .venv | VER>NUL
                     os.system(f'''git push origin ''')
                 os.chdir(self.curdir)
 
-
-    def stage_92_pack_me(self):
-        '''
-        Pack sources and deps for audit
-        '''
-        lines = []
-        ext_dirs = ''
-        if Path('app').exists():
-            ext_dirs = 'app'
-        lines.append(fr'''
-copy {self.clean_checkouted_sources_path} {self.audit_archive_path}
-7z a -mx=1 -tzip {self.audit_archive_path} {self.spec.bin_dir} {self.spec.libscon_dir} {ext_dirs} Vagrantfile "install-*.*" "ta-*.bat" "ta-*.ps1" "audit-*.bat" make-iso.py readme.html 
-''')
-        mn_ = get_method_name()
-        self.lines2bat(mn_, lines)
-
-        
-    #     time_prefix = datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
-    #     parentdir, curname = os.path.split(self.curdir)
-    #     disabled_suffix = curname + '.tar.bz2'
-
-    #     banned_ext = ['.old', '.iso', '.lock', disabled_suffix, '.dblite', '.tmp', '.log']
-    #     banned_start = ['tmp', '.venv', '!', '.git']
-    #     banned_mid = ['/out', 'printscreenmark', '/wtf', '/ourwheel/', '/ourwheel-', '/test.', '/test/', '/.vagrant', '/.vscode', '/key/', '/tmp/', '/src.', '/bin.',  '/cache_', 'cachefilelist_', '/.image', '/!']
-
-    #     def filter_(tarinfo):
-    #         for s in banned_ext:
-    #             if tarinfo.name.endswith(s):
-    #                 print(tarinfo.name)
-    #                 return None
-
-    #         for s in banned_start:
-    #             if tarinfo.name.startswith(s):
-    #                 print(tarinfo.name)
-    #                 return None
-
-    #         for s in banned_mid:
-    #             if s in tarinfo.name:
-    #                 print(tarinfo.name)
-    #                 return None
-
-    #         return tarinfo
-
-
-    #     filename = 'win-sources-for-audit'        
-    #     tarname = os.path.join(self.curdir, f"{filename}.tar")
-    #     tar = tarfile.open(tarname, "w")
-    #     tar.add(self.curdir, f"{filename}", recursive=True, filter=filter_)
-    #     tar.close()
-    #     self.cmd(f'''powershell -c 'Compress-Archive -Path "{tarname}" -DestinationPath "{filename}.zip" -CompressionLevel Optimal' ''')
-
-    # #     tbzname = os.path.join(self.curdir,
-    # #             "%(time_prefix)s-%(curname)s.tar.bz2" % vars())
-    # #     tar = tarfile.open(tbzname, "w:bz2")
-    # #     tar.add(self.curdir, recursive=True, filter=filter_)
-    # #     tar.close()
-
-
     def stage_50_output(self):
         '''
-        Generate «out» for ditribution
+        Generate «output folders» for ditribution
         '''
-        lines = []
-        output_ = self.spec.output
-        out_dir = output_.distro_dir.replace('/', '\\')
-        lines.append(fR'rmdir /S /Q "{out_dir}" ')
-        lines.append(fR'if not exist "{out_dir}" mkdir "{out_dir}" ')
+        lines_all = []
+        for output_key, output_ in self.spec.outputs.items():
+            build_output_name = f'generate-output-folder-for-{output_key}'
+            lines = []
+            out_dir = output_key.replace('/', '\\') + '\\iso'
+            lines.append(fR'rmdir /S /Q "{out_dir}" ')
+            lines.append(fR'if not exist "{out_dir}" mkdir "{out_dir}" ')
 
-        buildroot = self.spec.buildroot_dir
-        srcdir  = self.spec.src_dir
-        bindir  = self.spec.bin_dir
-        for folder, sources_ in output_.folders.items():
-            if isinstance(sources_, str):
-                sources_ = [s.strip() for s in sources_.strip().split("\n")]
-            dst_folder = (out_dir + os.path.sep + folder).replace('/', os.path.sep)
-            lines.append(fR"""
-if not exist "{dst_folder}" mkdir "{dst_folder}"
-    """)
-            for from_ in sources_:
-                from__ = from_
-                from__ = eval(f"fR'{from_}'")
-                if not os.path.splitext(from__)[1]:
-                    from__ += R'\*'
+            buildroot = self.spec.buildroot_dir
+            srcdir  = self.spec.src_dir
+            bindir  = self.spec.bin_dir
+            folders = output_.folders
+            for folder, sources_ in folders.items():
+                if isinstance(sources_, str):
+                    folders[folder] = [sources_]
+                    
+            if 'inherit' in output_:
+                for k, v in self.spec.outputs[output_.inherit].folders.items():
+                    if k not in folders:
+                        folders[k] = v
+                    else:    
+                        if isinstance(v, str):
+                            v = [v]
+                        folders[k] = sorted( set(folders[k]) | set(v) ) 
+            # folders = dict(**self.spec.outputs[output_.inherit].folders)
+            # folders = {**folders, **output_.folders} 
+            
+            for folder, sources_ in folders.items():
+                # if isinstance(sources_, str):
+                #     sources_ = [s.strip() for s in sources_.strip().split("\n")]
+                dst_folder = (out_dir + os.path.sep + folder).replace('/', os.path.sep)
                 lines.append(fR"""
-echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
-    """)
-        # self.lines2bat(f'50-output-{self.out_dir}', lines, 'output')
+    if not exist "{dst_folder}" mkdir "{dst_folder}"
+        """)
+                for from_ in sources_:
+                    from__ = from_
+                    from__ = eval(f"fR'{from_}'")
+                    if not os.path.splitext(from__)[1]:
+                        from__ += R'\*'
+                    lines.append(fR"""
+    echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
+        """)
+                    
+            self.lines2bat(build_output_name, lines)
+            lines_all.append(f'call ta-{build_output_name}.bat')
+
         mn_ = get_method_name()
-        self.lines2bat(mn_, lines, mn_)
+        self.lines2bat(mn_, lines_all, mn_)
         pass
 
     def stage_90_audit_analyse(self):
@@ -1458,7 +1363,7 @@ echo n | xcopy /I /S /Y  "{from__}" {dst_folder}\
             mn_ = get_method_name()
             lines = [
                 f'''
-{sys.executable} {sys.argv[0]} "{self.args.specfile}" --stage-audit-analyse
+{sys.executable} {sys.argv[0]}-script.py "{self.args.specfile}" --stage-audit-analyse
                 ''']
             self.lines2bat(mn_, lines, mn_)
             return
@@ -1703,16 +1608,13 @@ dot -Tsvg reports/pipdeptree.dot > reports/pipdeptree.svg
             self.git_sync()
             return
 
-        # if self.args.stage_pack_me:
-        #     self.pack_me()
-        #     return
-
-        # !!! Разобраться, засунуть в стейдж.
-        # self.gen_docs()
-
-
         self.build_mode = False
         self.clear_shell_files()
+
+        if 'util_commands' in self.spec:
+            for util_name, command in self.spec['util_commands'].items():
+                self.lines2bat(util_name, [command])
+
         for stage_ in self.stage_methods:
             stage_()
 
@@ -1720,18 +1622,4 @@ dot -Tsvg reports/pipdeptree.dot > reports/pipdeptree.svg
         for stage_ in self.stage_methods:
             stage_()
 
-
-        # self.generate_download()
-        # self.generate_install()
-        # self.generate_download_base_wheels()
-        # self.generate_init_env()
-        # self.generate_checkout_sources()
-        # self.generate_download_wheels()
-        # self.generate_build_conanlibs()
-        # for _ in range(2):
-            # self.generate_build_wheels()
-            # self.generate_install_wheels()
-        # self.generate_build_projects()
-        # self.generate_output()
-        # self.write_sandbox()
         pass
