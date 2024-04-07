@@ -720,46 +720,6 @@ set PIPENV_PIPFILE=
         self.lines2bat(mn_, lines, mn_)
         pass
 
-
-
-#     def stage_97_write_sandbox(self):
-#         '''
-#           run a windows standbox
-#         '''
-#         # Генерация Windows-песочницы (облегченной виртуальной машины)
-#         # для чистой сборки в нулевой системе.
-#         root_dir = self.root_dir
-#         wsb_config = fr'''
-# <Configuration>
-# <MemoryInMB>8192</MemoryInMB>
-# <MappedFolders>
-# <MappedFolder><HostFolder>%~dp0</HostFolder>
-# <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\distro</SandboxFolder>
-# <ReadOnly>false</ReadOnly></MappedFolder>
-# </MappedFolders>
-# </Configuration>
-# '''
-
-# # <LogonCommand>
-# # <Command>C:\Users\WDAGUtilityAccount\Desktop\distro\ta-99-useful-tools.bat</Command>
-# # </LogonCommand>
-
-#         lines = []
-
-#         lines.append(f'''
-# rem
-# setlocal enableDelayedExpansion
-# type nul > ta-sandbox.wsb
-# ''')
-#         for line in wsb_config.strip().split("\n"):
-#             lines.append(f'set "tag_line={line}"')
-#             lines.append(f'echo !tag_line! >> ta-sandbox.wsb ')
-
-#         lines.append(f'start ta-sandbox.wsb')
-
-#         mn_ = get_method_name()
-#         self.lines2bat(mn_, lines)
-
     def stage_51_make_iso(self):
         '''
           Make ISOs
