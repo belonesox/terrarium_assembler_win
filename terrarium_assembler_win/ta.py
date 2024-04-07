@@ -555,7 +555,6 @@ msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{
             lines.append("CMD /C ta-" + b_ + '.bat' + '\n\r')
             lines.append(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
 
-
         mn_ = get_method_name()
         self.lines2bat(mn_, lines, mn_)
         pass
@@ -593,8 +592,6 @@ msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{
         for name_, it_ in self.spec.download_and_install.items():
             if isinstance(it_, dict):
                 msvc_components = ''
-                if name_ in ['far']:
-                    wtf = 444
                 if 'download' in it_:
                     download_ = it_.download
                     if isinstance(download_, dict):
