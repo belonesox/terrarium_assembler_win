@@ -721,42 +721,6 @@ set PIPENV_PIPFILE=
         pass
 
 
-#     def stage_96_start_clean_box(self):
-#         '''
-#           write Vagrant file for Hyper-V internal builder
-#         '''
-#         # Генерация Windows-песочницы (виртуальной машины)
-#         # для чистой сборки в нулевой системе.
-#         root_dir = self.root_dir
-#         Path('Vagrantfile').write_text(fr'''
-# Vagrant.configure(2) do |config|
-#   config.vm.box_check_update = false
-#   config.vm.synced_folder '.', '/vagrant', disabled: true
- 
-#   config.vm.define "ta-builder-hyperv" do |conf|
-#     vmname = "ta-builder-hyperv"
-#     conf.vm.box = "ta-builder-hyperv"
-#     conf.vm.box_url = "./in/bin/vagrant-boxes/hyperv/hypev-win.box"
-#     config.vm.provider "hyperv" do |h|
-#        h.maxmemory = 8192
-#        h.linked_clone = true
-#        h.cpus = 4    
-#        h.enable_virtualization_extensions = true
-#        h.vm_integration_services = {{
-#           guest_service_interface: true,
-#        }}	
-#     end
-#     conf.vm.synced_folder '.', 'C:\\distro', disabled: false
-#   end
-# end
-# ''')
-#         lines = []
-#         lines.append(rf'''
-# vagrant up                     
-# powershell -c "vmconnect.exe $env:computername $(Get-VM -Id $(Get-Content .\.vagrant\machines\ta-builder-hyperv\hyperv\id)).Name"
-# ''')
-#         mn_ = get_method_name()
-#         self.lines2bat(mn_, lines)
 
 #     def stage_97_write_sandbox(self):
 #         '''
