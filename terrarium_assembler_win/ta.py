@@ -408,9 +408,6 @@ if exist "{newpath}\" (
                         return nfm_
                     return nuitka_flags
 
-                if 'snsm' in outputname:
-                    wtfff=1
-
                 nuitka_flags = inherit_flags(nuitka_flags)
 
                 nf_ = NuitkaFlags(**nuitka_flags)
