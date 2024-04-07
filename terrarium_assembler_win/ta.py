@@ -413,17 +413,6 @@ if exist "{newpath}\" (
 
                 nuitka_flags = inherit_flags(nuitka_flags)
 
-                # nuitka_flags_inherit = self.spec[nuitka_flags.inherit]
-                # # Пока считаем, что наследоваться можно только один раз
-                # assert 'inherit' not in nuitka_flags_inherit
-                # nfm_ = edict({**nuitka_flags_inherit})
-                # for group in nuitka_flags:
-                #     if group in nfm_:
-                #         nfm_[group] = list(set(nfm_[group]).union(set(nuitka_flags[group])))
-                #     else:
-                #         nfm_[group] = nuitka_flags[group]
-                # del nfm_['inherit']
-
                 nf_ = NuitkaFlags(**nuitka_flags)
                 nflags_ = nf_.get_flags(tmpdir, nuitka_flags)
 
