@@ -720,21 +720,6 @@ set PIPENV_PIPFILE=
         self.lines2bat(mn_, lines, mn_)
         pass
 
-    # def stage_91_pack_svace_dirs(self):
-    #     '''
-    #       Pack .svace-dir from all build directories
-    #     '''
-    #     # Генерация Windows-песочницы (облегченной виртуальной машины)
-    #     # для чистой сборки в нулевой системе.
-    #     root_dir = self.root_dir
-    #     ...
-    #     # svace_dirs = []
-    #     svace_dirs = [f.as_posix() for f in Path(self.spec.builds_dir).rglob('**/.svace-dir')]
-    #     scmd = '7z a -t7z -m0=BCJ2 -m1=LZMA2:d=1024m -aoa ta-svace-dirs.zip ' + ' '.join(svace_dirs)           
-    #     mn_ = get_method_name()
-    #     self.lines2bat(mn_, [scmd], mn_)
-    #     ...        
-
 
 #     def stage_96_start_clean_box(self):
 #         '''
