@@ -329,7 +329,6 @@ if exist "{newpath}\" (
         pass
 
     def get_all_sources(self):
-        # for td_ in self.spec.projects:
         for git_url, td_ in self.spec.projects.items():
             git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
             yield git_url, git_branch, path_to_dir_
