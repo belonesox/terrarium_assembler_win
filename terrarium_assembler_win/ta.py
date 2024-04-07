@@ -318,23 +318,6 @@ popd
 '''
                 lines.append(scmd)
 
-#                 lines2.append(f'''
-# pushd "{path_to_dir}"
-# set PACKAGE=
-# if exist setup.py (
-
-# FOR /F %%i IN ('..\..\..\.venv\Scripts\python.exe setup.py --name') DO set PACKAGE=%%i
-# echo %PACKAGE%
-# ..\..\..\.venv\Scripts\python.exe -m pip uninstall %PACKAGE% -y
-# ..\..\..\.venv\Scripts\python.exe setup.py develop
-
-# )
-# popd
-
-# ''')
-# ..\..\..\.venv\Scripts\python.exe -m pip uninstall  {probably_package_name} -y
-
-
                 # Fucking https://www.virtualbox.org/ticket/19086 + https://www.virtualbox.org/ticket/8761
                 lines.append(fr"""
 if exist "{newpath}\" (
