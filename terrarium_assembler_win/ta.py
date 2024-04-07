@@ -861,9 +861,7 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
                     if os.path.exists(file_):
                         paths_.append(fr' -r {setup_path}\{file_}')
                         break
-
-
-            pass
+            ...            
 
         os.chdir(self.curdir)
         setup_paths = " ".join(paths_)
