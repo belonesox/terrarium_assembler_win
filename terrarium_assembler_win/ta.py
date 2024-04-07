@@ -844,7 +844,6 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
             probably_package_name = os.path.split(path_to_dir_)[-1]
 
             path_ = setup_path = path_to_dir_
-            # path_ = os.path.relpath(setup_path, start=self.curdir)
 
             os.chdir(self.curdir)
             if os.path.exists(setup_path):
