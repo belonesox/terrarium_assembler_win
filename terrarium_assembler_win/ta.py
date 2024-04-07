@@ -842,9 +842,6 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
 
             git_url, git_branch, path_to_dir_, _ = self.explode_pp_node(git_url, td_)
             probably_package_name = os.path.split(path_to_dir_)[-1]
-            # path_to_dir = os.path.relpath(path_to_dir_, start=self.curdir)
-            # scmd = fr'echo "** Downloading dependend wheels for {path_to_dir} **"'
-            # lines.append(scmd)
 
             path_ = setup_path = path_to_dir_
             # path_ = os.path.relpath(setup_path, start=self.curdir)
