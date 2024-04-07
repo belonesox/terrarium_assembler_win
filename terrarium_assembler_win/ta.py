@@ -1421,9 +1421,8 @@ dot -Tsvg reports/pipdeptree.dot > reports/pipdeptree.svg
 
     def process(self):
         '''
-        Основная процедура генерации проекта,
-        и возможно его выполнения, если соответствующие опции
-        командной строки активированы.
+        The main procedure for generating the project stage command files
+        and it is possible to execute it if the relevant options are activated.
         '''
 
         if self.args.folder_command:
