@@ -29,6 +29,7 @@ FSUTIL DIRTY query %SystemDrive% >NUL || (
 )
 """
 
+INSTALL_ALL_WHEELS_SCRIPT="install-all-wheels.py"
 
 def write_doc_table(filename, headers, rows):
     with open(filename, 'w', encoding='utf-8') as lf:
@@ -678,7 +679,7 @@ set PATH={to_};%PATH%'''.split('\n')
         '''
         root_dir = self.root_dir
         
-        with open("install-all-wheels.py", "w", encoding='utf-8') as lf:
+        with open(INSTALL_ALL_WHEELS_SCRIPT, "w", encoding='utf-8') as lf:
             lf.write(r"""
 import sys
 import os
@@ -716,7 +717,7 @@ del /Q Pipfile | VER>NUL
 rmdir /Q /S .venv | VER>NUL
 set PIPENV_PIPFILE=
 {python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe
-{python_dir}\python -E -m pipenv run python install-all-wheels.py {self.spec.basewheel_dir} '
+{python_dir}\python -E -m pipenv run python {INSTALL_ALL_WHEELS_SCRIPT} {self.spec.basewheel_dir} '
         ''')
 
         mn_ = get_method_name()
@@ -1115,7 +1116,7 @@ rmdir /Q /S .venv | VER>NUL
 {self.spec.python_dir}\python -E -m pipenv --python {self.spec.python_dir}\python.exe
         ''')
 
-        scmd = fr'{self.spec.python_dir}/python -m pipenv run python install-all-wheels.py {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
+        scmd = fr'{self.spec.python_dir}/python -m pipenv run python {INSTALL_ALL_WHEELS_SCRIPT} {self.spec.extwheel_dir} {self.spec.depswheel_dir} {self.spec.ourwheel_dir} '
         lines.append(fix_win_command(scmd))
 
         scmd = fr'{self.spec.python_dir}/python -m pipenv run pip list --format json > {self.pip_list_json}'
