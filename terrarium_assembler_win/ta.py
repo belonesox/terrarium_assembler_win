@@ -414,7 +414,6 @@ if exist "{newpath}\" (
                 nflags_ = nf_.get_flags(tmpdir, nuitka_flags)
 
                 target_dir = os.path.join(tmpdir, outputname + '.dist')
-                target_dir_ = os.path.relpath(target_dir, start=self.curdir)
 
                 src = os.path.join(path_to_dir, srcname)
                 flags_ = nflags_
