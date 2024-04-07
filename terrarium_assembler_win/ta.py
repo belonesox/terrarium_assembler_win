@@ -257,16 +257,6 @@ exit /b %errorlevel%
         st = os.stat(fname)
         os.chmod(fname, st.st_mode | stat.S_IEXEC)
 
-        # if stage:
-        #     param = stage.replace('-', '_')
-        #     option = "stage_" + param
-        #     dict_ = vars(self.args)
-        #     if option in dict_:
-        #         if dict_[option]:
-        #             print("*"*20)
-        #             print("Executing ", fname)
-        #             print("*"*20)
-        #             os.system(fname)
         pass
 
 
