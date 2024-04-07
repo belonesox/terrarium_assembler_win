@@ -349,10 +349,6 @@ if exist "{newpath}\" (
         path_to_dir = os.path.join(self.spec.src_dir, giturl2folder(git_url))
         setup_path = path_to_dir
 
-        # if 'subdir' in td_:
-        #     subdir = td_.subdir
-        # setup_path = path_to_dir
-
         return git_url, git_branch, path_to_dir, setup_path
 
 
