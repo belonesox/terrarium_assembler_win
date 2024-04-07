@@ -76,7 +76,6 @@ class TerrariumAssembler:
     def __init__(self):
         self.curdir = os.getcwd()
         self.root_dir = None
-        # self.buildroot_dir = 'C:/docmarking-buildroot'
         self.ta_name = 'terrarium_assembler'
 
         self.pipenv_dir = ''
@@ -86,8 +85,6 @@ class TerrariumAssembler:
         self.need_pips = ['pip-audit', 'pipdeptree', 'ordered-set', 'cyclonedx-bom']
 
         vars_ = {
-        #     'pipenv_dir': self.pipenv_dir,
-        #     # 'buildroot_dir': self.buildroot_dir
         }
 
         ap = argparse.ArgumentParser(description='Create a portable windows application')
