@@ -1,7 +1,6 @@
 """Main module."""
 
 import argparse
-import io
 import os
 import subprocess
 import shutil
