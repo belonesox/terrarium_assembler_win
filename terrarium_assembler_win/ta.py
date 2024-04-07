@@ -834,10 +834,6 @@ set CONANROOT=%CONAN_USER_HOME%\.conan\data
 
         paths_ = []
         for pp in self.spec.python_packages:
-            # scmd = fr'echo "** Downloading wheel for {pp} **"'
-            # lines.append(scmd)
-            # scmd = fr"{self.spec.python_dir}\python -m pip download {pp} --dest {wheel_dir} "
-            # lines.append(scmd)
             paths_.append(pp)
 
         for git_url, td_ in self.spec.projects.items():
