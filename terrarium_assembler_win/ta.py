@@ -557,9 +557,6 @@ msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{
 
 
         mn_ = get_method_name()
-        # self.lines2sh(mn_, lines, mn_)
-        # !!!
-        # self.lines2bat(f"40-build-projects-{self.out_dir}", lines, "build-projects")
         self.lines2bat(mn_, lines, mn_)
         pass
 
