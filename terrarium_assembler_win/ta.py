@@ -3,19 +3,13 @@
 import argparse
 import io
 import os
-import pathlib
 import subprocess
 import shutil
 import sys
 from tempfile import mkstemp
-import stat
 import re
 import yaml
 import dataclasses as dc
-import datetime
-import tarfile
-import hashlib
-import time
 import json
 import csv
 import requirements
@@ -28,6 +22,13 @@ from pathlib import Path, PurePath
 DEBUG = False
 if 'debugpy' in sys.modules:
     DEBUG = True
+
+MAGIC_TO_SELF_ELEVATE="""
+FSUTIL DIRTY query %SystemDrive% >NUL || (
+    PowerShell "Start-Process -FilePath cmd.exe -Args '/C CHDIR /D %CD% & "%0"' -Verb RunAs"
+    EXIT
+)
+"""
 
 
 def write_doc_table(filename, headers, rows):
@@ -237,6 +238,8 @@ set PYTHONHOME=%TA_python_dir%
             for lines_ in lines:
                 for line_ in lines_.split('\n'):
                     if line_:
+                        if "elevateme" in line_:
+                            lf.write(MAGIC_TO_SELF_ELEVATE)
                         lf.write(f'''{line_}\n''')
                         if line_.strip() and not line_.startswith('for ') and not line_.startswith('set '):
                             lf.write(f'''if %errorlevel% neq 0 exit /b %errorlevel%\n\n''')
@@ -681,6 +684,7 @@ msbuild  {msbuild_flags} /p:OutDir="%TA_PROJECT_DIR%{odir_}" /p:Configuration="{
 
         Path('ta-if-symlink.ps1').write_text(r'''Get-Item $Env:TA_PROJECT_DIR | Select-Object | foreach {if($_.Target){$_.Target.replace('UNC\', '\\')+'\'}}''')
         lines.append(r'''
+rem elevateme
 cd %TA_PROJECT_DIR%                     
 for /f %%i in ('powershell -executionpolicy bypass -File %TA_PROJECT_DIR%\ta-if-symlink.ps1') do set "TA_SYMLINK_PREFIX=%%i"''')
 
