@@ -343,16 +343,8 @@ if exist "{newpath}\" (
 )
 """)
 
-#         lines.append(fr"""
-# del /Q {self.clean_checkouted_sources_path} | VER>NUL 
-# 7z a -tzip "{self.clean_checkouted_sources_path}" "{self.spec.src_dir}"
-# """)
-# powershell compression sucks
-#powershell -c 'Compress-Archive -Path "in\src" -DestinationPath "{self.clean_checkouted_sources}" -CompressionLevel Optimal'
-
         mn_ = get_method_name()
         self.lines2bat(mn_, lines, mn_)
-        # self.lines2bat("96-developmode", lines2)
         pass
 
     def get_all_sources(self):
