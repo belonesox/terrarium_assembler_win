@@ -991,16 +991,6 @@ rmdir /S /Q  {relwheelpath}
         os.chdir(self.curdir)
 
         lines = []
-        # pl_ = self.get_wheel_list_to_install()
-
-        #--use-feature=2020-resolver
-        # scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --no-dependencies --ignore-installed  %s ' % (" ".join(pl_))
-        # lines.append(fix_win_command(scmd))
-
-        # for p_ in pl_:
-        #     scmd = fr'{self.spec.python_dir}/python -m pip install --no-deps --force-reinstall --ignore-installed  %s ' % p_
-        #     lines.append(fix_win_command(scmd))
-# {self.spec.python_dir}\python -E -m pipenv --rm | VER>NUL
 
         lines.append(fr'''
 del /Q Pipfile | VER>NUL
