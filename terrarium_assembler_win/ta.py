@@ -770,6 +770,87 @@ cmd /c "mklink /H {output_key}\last.iso {output_key}\%isofilename%"
         pass
 
 
+    def stage_52_make_msi(self):
+        '''
+          Make ISOs
+        '''
+
+        lines_all = []        
+        for output_key, output_ in self.spec.outputs.items():
+            build_output_name = f'generate-msi-for-{output_key}'
+            
+            lines_ = []
+            changelog_mode = "\n".join(lines_)
+            
+            wxs_file =f"""
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <!-- Use * to generate product ID on every build -->
+    <Product Id="*" Language="1033" Manufacturer="{self.spec.vendor}" Name="{output_key}" Version="{self.spec.version}">
+        <Package InstallScope="perMachine" Compressed="yes" />
+        <MediaTemplate EmbedCab="yes" />
+        <!--Directory structure-->
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <!-- <Directory Id="INSTALLDIR" Name="InstallFolder"/> -->
+        </Directory>
+        <!--Features-->
+        <Feature Id="AllOfTheFiles">
+            <ComponentGroupRef Id="CMPG_AllOfTheFiles"/>
+        </Feature>
+	<CustomAction Id='OurInstall' Directory='TARGETDIR' Execute='deferred' Impersonate='no' ExeCommand='{output_.install_cmd}' Return='check' />
+	<InstallExecuteSequence>
+		<Custom Action='OurInstall' Before='InstallFinalize'/>
+	</InstallExecuteSequence>
+    </Product>
+</Wix>
+""".strip()   
+            wxs_dir = fr'tmp\msi\{output_key}'
+            # Потом переписать куда-нибудь наверно не в тмп.
+            Path(wxs_dir).mkdir(exist_ok=True, parents=True)
+            wxs_filename = fr'{wxs_dir}\{output_key}.wxs'
+            Path(wxs_filename).write_text(wxs_file)
+
+            python_dir = self.spec.python_dir.replace("/", "\\")
+            scmd = fR"""
+rem
+for /f "skip=1" %%x in ('wmic os get localdatetime') do if not defined CurDate set CurDate=%%x
+echo %CurDate%
+set yyyy=%CurDate:~0,4%
+set mm=%CurDate:~4,2%
+set dd=%CurDate:~6,2%
+set hh=%CurDate:~8,2%
+set mi=%CurDate:~10,2%
+set ss=%CurDate:~12,2%
+set datestr=%yyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
+set isoprefix=%datestr%-dm-win-distr
+set isofilename=%isoprefix%.msi
+set changelogfilename=%isoprefix%.changelog.txt
+echo %isofilename% > {output_key}/iso/isodistr.txt
+for /f "tokens=*" %%i in ('dir /b /o:n "{output_key}\*.iso"') do set lastiso=%%~ni
+set /a "pyyyy=%yyyy%-1"
+if not defined lastiso set lastiso=%pyyyy%-%mm%-%dd%-%hh%-%mi%-%ss%
+set pyyyy=%lastiso:~0,4%
+set pmm=%lastiso:~5,2%
+set pdd=%lastiso:~8,2%
+echo "%pyyyy%-%pmm%-%pdd%"
+set TA_DISTR_ISO=%TA_PROJECT_DIR%\{output_key}\iso
+
+C:\ta-buildroot\wixtoolset\heat.exe dir %TA_DISTR_ISO% -cg CMPG_AllOfTheFiles -ke -dr TARGETDIR -gg -sfrag -srd -o {wxs_dir}\iso-{output_key}.wxs -var env.TA_DISTR_ISO
+pushd {wxs_dir}
+C:\ta-buildroot\wixtoolset\candle.exe iso-{output_key}.wxs {output_key}.wxs
+popd
+C:\ta-buildroot\wixtoolset\light.exe {wxs_dir}\iso-{output_key}.wixobj {wxs_dir}\{output_key}.wixobj -o {output_key}/%isofilename%
+del /Q {output_key}\last.msi | VER>NUL
+cmd /c "mklink /H {output_key}\last.msi {output_key}\%isofilename%"
+"""
+            self.lines2bat(build_output_name, [scmd])
+            lines_all.append(f'call ta-{build_output_name}.bat')
+
+        mn_ = get_method_name()
+        self.lines2bat(mn_, lines_all, mn_)
+        pass
+
+
     def stage_04_download_base_wheels(self):
         '''
         Download base wheel python packages
@@ -1150,6 +1231,8 @@ rmdir /Q /S .venv | VER>NUL
                     
             if 'inherit' in output_:
                 for k, v in self.spec.outputs[output_.inherit].folders.items():
+                    if 'dm-embed-pipeline' in k:
+                        wtf = 1
                     if k not in folders:
                         folders[k] = v
                     else:    
