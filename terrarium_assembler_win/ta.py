@@ -786,7 +786,7 @@ cmd /c "mklink /H {output_key}\last.iso {output_key}\%isofilename%"
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <!-- Use * to generate product ID on every build -->
-    <Product Id="*" Language="1033" Manufacturer="{self.spec.vendor}" Name="{output_key}" Version="{self.spec.version}">
+    <Product Id="*" Language="1049" Codepage='1251' Manufacturer="{self.spec.vendor}" Name="{output_key}" Version="{self.spec.version}">
         <Package InstallScope="perMachine" Compressed="yes" />
         <MediaTemplate EmbedCab="yes" />
         <!--Directory structure-->
@@ -837,9 +837,9 @@ set TA_DISTR_ISO=%TA_PROJECT_DIR%\{output_key}\iso
 
 C:\ta-buildroot\wixtoolset\heat.exe dir %TA_DISTR_ISO% -cg CMPG_AllOfTheFiles -ke -dr TARGETDIR -gg -sfrag -srd -o {wxs_dir}\iso-{output_key}.wxs -var env.TA_DISTR_ISO
 pushd {wxs_dir}
-C:\ta-buildroot\wixtoolset\candle.exe iso-{output_key}.wxs {output_key}.wxs
+C:\ta-buildroot\wixtoolset\candle.exe -cultures:ru-RU  iso-{output_key}.wxs {output_key}.wxs
 popd
-C:\ta-buildroot\wixtoolset\light.exe {wxs_dir}\iso-{output_key}.wixobj {wxs_dir}\{output_key}.wixobj -o {output_key}/%isofilename%
+C:\ta-buildroot\wixtoolset\light.exe -cultures:ru-RU {wxs_dir}\iso-{output_key}.wixobj {wxs_dir}\{output_key}.wixobj -o {output_key}/%isofilename%
 del /Q {output_key}\last.msi | VER>NUL
 cmd /c "mklink /H {output_key}\last.msi {output_key}\%isofilename%"
 """
