@@ -782,11 +782,15 @@ cmd /c "mklink /H {output_key}\last.iso {output_key}\%isofilename%"
             lines_ = []
             changelog_mode = "\n".join(lines_)
             
+            vendor  = self.spec.get('vendor', 'NoName')
+            version = self.spec.get('version', '1.0.0')
+            install_cmd = output_.get('install_cmd', '')
+            
             wxs_file =f"""
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <!-- Use * to generate product ID on every build -->
-    <Product Id="*" Language="1049" Codepage='1251' Manufacturer="{self.spec.vendor}" Name="{output_key}" Version="{self.spec.version}">
+    <Product Id="*" Language="1049" Codepage='1251' Manufacturer="{vendor}" Name="{output_key}" Version="{version}">
         <Package InstallScope="perMachine" Compressed="yes" />
         <MediaTemplate EmbedCab="yes" />
         <!--Directory structure-->
@@ -797,7 +801,7 @@ cmd /c "mklink /H {output_key}\last.iso {output_key}\%isofilename%"
         <Feature Id="AllOfTheFiles">
             <ComponentGroupRef Id="CMPG_AllOfTheFiles"/>
         </Feature>
-	<CustomAction Id='OurInstall' Directory='TARGETDIR' Execute='deferred' Impersonate='no' ExeCommand='{output_.install_cmd}' Return='check' />
+	<CustomAction Id='OurInstall' Directory='TARGETDIR' Execute='deferred' Impersonate='no' ExeCommand='{install_cmd}' Return='check' />
 	<InstallExecuteSequence>
 		<Custom Action='OurInstall' Before='InstallFinalize'/>
 	</InstallExecuteSequence>
